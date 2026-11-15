@@ -1,11 +1,50 @@
+import type { HumanActor } from "@annotatekit/core";
 import { actorFromClaims, DEFAULT_AUDIENCE } from "./host.js";
 import { bearerToken, signToken, verifyToken } from "./jwt.js";
 import { type OidcProvider, pkceChallenge, randomState } from "./oidc.js";
 import type { Verifier } from "./verifier.js";
 
+/**
+ * A sign-in method the standalone handler can run: OIDC providers from
+ * `oidc()`, or others such as SAML from `@annotatekit/auth-saml`.
+ */
+export interface LoginProvider {
+  readonly id: string;
+  /** `query` when the IdP redirects back with GET (OIDC), `form_post` when it POSTs (SAML). */
+  readonly responseMode?: "query" | "form_post";
+  /** The URL to send the browser to. Echo `state` back (as `state` or SAML `RelayState`). */
+  begin(params: {
+    redirectUri: string;
+    state: string;
+    nonce: string;
+    codeChallenge: string;
+  }): Promise<string>;
+  /** Verifies the IdP's response and returns who signed in. Throws on any failure. */
+  complete(params: {
+    params: URLSearchParams;
+    redirectUri: string;
+    codeVerifier: string;
+    nonce: string;
+  }): Promise<HumanActor>;
+}
+
+function toLoginProvider(provider: OidcProvider | LoginProvider): LoginProvider {
+  if ("begin" in provider) return provider;
+  return {
+    id: provider.id,
+    responseMode: "query",
+    begin: (params) => provider.authorizationUrl(params),
+    complete: ({ params, redirectUri, codeVerifier, nonce }) => {
+      const code = params.get("code");
+      if (!code) throw new Error("No authorization code");
+      return provider.exchange({ code, redirectUri, codeVerifier, nonce });
+    },
+  };
+}
+
 export interface StandaloneAuthOptions {
   /** Identity providers people can sign in with, by `provider.id`. */
-  providers: OidcProvider[];
+  providers: (OidcProvider | LoginProvider)[];
   /** Signs AnnotateKit sessions and login state, at least 32 bytes. */
   sessionSecret: string;
   /** Public URL of this handler, e.g. `https://annotatekit.acme.com/auth`. Callbacks go to `<baseUrl>/<id>/callback`. */
@@ -29,7 +68,7 @@ export interface StandaloneAuth {
    *
    * - `GET /providers`: the provider ids, for the sign-in menu.
    * - `GET /<id>/login?origin=<page origin>`: opens the IdP (in a popup).
-   * - `GET /<id>/callback`: finishes the login and posts the session to the opener.
+   * - `GET` (or `POST` for SAML) `/<id>/callback`: finishes the login and posts the session to the opener.
    */
   handler(request: Request): Promise<Response>;
   /** Verifies the session tokens this handler issues. */
@@ -64,20 +103,20 @@ export function createStandaloneAuth(options: StandaloneAuthOptions): Standalone
   const ttlSeconds = options.sessionTtlSeconds ?? 8 * 3600;
   const now = options.now ? { now: options.now } : {};
   const secure = base.protocol === "https:";
-  const providers = new Map(options.providers.map((p) => [p.id, p]));
+  const providers = new Map(options.providers.map((p) => [p.id, toLoginProvider(p)]));
   const originRes = options.allowedOrigins.map(
     (o) => new RegExp(`^${o.replace(/[.+?^${}()|[\]\\]/g, "\\$&").replace(/\*/g, "[^/]*")}$`),
   );
   const originAllowed = (origin: string) => originRes.some((re) => re.test(origin));
   const redirectUri = (id: string) => `${base.origin}${basePath}/${id}/callback`;
 
-  async function login(provider: OidcProvider, url: URL): Promise<Response> {
+  async function login(provider: LoginProvider, url: URL): Promise<Response> {
     const origin = url.searchParams.get("origin") ?? "";
     if (!originAllowed(origin)) return text(403, "This site may not sign in to AnnotateKit");
     const state = randomState();
     const nonce = randomState();
     const verifier = randomState() + randomState();
-    const location = await provider.authorizationUrl({
+    const location = await provider.begin({
       redirectUri: redirectUri(provider.id),
       state,
       nonce,
@@ -99,13 +138,21 @@ export function createStandaloneAuth(options: StandaloneAuthOptions): Standalone
       status: 302,
       headers: {
         location,
-        "set-cookie": stateCookie(cookie, STATE_TTL),
+        "set-cookie": stateCookie(cookie, STATE_TTL, provider.responseMode === "form_post"),
         "cache-control": "no-store",
       },
     });
   }
 
-  async function callback(provider: OidcProvider, request: Request, url: URL): Promise<Response> {
+  async function callback(provider: LoginProvider, request: Request, url: URL): Promise<Response> {
+    let params = url.searchParams;
+    if (request.method === "POST") {
+      try {
+        params = new URLSearchParams(await request.text());
+      } catch {
+        return text(400, "Unreadable sign-in response");
+      }
+    }
     const raw = readCookie(request, STATE_COOKIE);
     const flow = raw
       ? await verifyToken(raw, {
@@ -122,20 +169,19 @@ export function createStandaloneAuth(options: StandaloneAuthOptions): Standalone
     }
     const origin = flow.origin;
     if (!originAllowed(origin)) return text(403, "This site may not sign in to AnnotateKit", clear);
-    if (url.searchParams.get("error")) {
+    if (params.get("error")) {
       return popup(
         origin,
         { type: "annotatekit:error", error: "Sign-in was cancelled or refused" },
         clear,
       );
     }
-    const code = url.searchParams.get("code");
-    if (!code || url.searchParams.get("state") !== flow.state) {
+    if ((params.get("state") ?? params.get("RelayState")) !== flow.state) {
       return popup(origin, { type: "annotatekit:error", error: "Login state mismatch" }, clear);
     }
     try {
-      const actor = await provider.exchange({
-        code,
+      const actor = await provider.complete({
+        params,
         redirectUri: redirectUri(provider.id),
         codeVerifier: String(flow.verifier),
         nonce: String(flow.nonce),
@@ -159,13 +205,14 @@ export function createStandaloneAuth(options: StandaloneAuthOptions): Standalone
     }
   }
 
-  function stateCookie(value: string, maxAge: number): string {
+  // A SAML IdP POSTs back cross-site, which only carries SameSite=None cookies.
+  function stateCookie(value: string, maxAge: number, crossSitePost = false): string {
     const parts = [
       `${STATE_COOKIE}=${value}`,
       `Path=${basePath || "/"}`,
       `Max-Age=${maxAge}`,
       "HttpOnly",
-      "SameSite=Lax",
+      crossSitePost && secure ? "SameSite=None" : "SameSite=Lax",
     ];
     if (secure) parts.push("Secure");
     return parts.join("; ");
@@ -174,7 +221,6 @@ export function createStandaloneAuth(options: StandaloneAuthOptions): Standalone
   return {
     async handler(request) {
       const url = new URL(request.url);
-      if (request.method !== "GET") return text(405, "Method not allowed");
       if (!url.pathname.startsWith(basePath)) return text(404, "Not found");
       const path = url.pathname.slice(basePath.length);
       if (path === "/providers") {
@@ -183,7 +229,12 @@ export function createStandaloneAuth(options: StandaloneAuthOptions): Standalone
       const match = /^\/([A-Za-z0-9_-]+)\/(login|callback)$/.exec(path);
       const provider = match ? providers.get(match[1] as string) : undefined;
       if (!match || !provider) return text(404, "Not found");
-      return match[2] === "login" ? login(provider, url) : callback(provider, request, url);
+      if (match[2] === "login") {
+        return request.method === "GET" ? login(provider, url) : text(405, "Method not allowed");
+      }
+      const allowed = provider.responseMode === "form_post" ? "POST" : "GET";
+      if (request.method !== allowed) return text(405, "Method not allowed");
+      return callback(provider, request, url);
     },
     verifier: {
       async verify(request) {
@@ -196,9 +247,9 @@ export function createStandaloneAuth(options: StandaloneAuthOptions): Standalone
           maxTtlSeconds: ttlSeconds,
           ...now,
         });
-        if (typeof claims?.provider !== "string" || !claims.provider.startsWith("oidc:"))
-          return null;
-        return { actor: actorFromClaims(claims, claims.provider), expiresAt: claims.exp * 1000 };
+        const provider = claims?.provider;
+        if (!claims || typeof provider !== "string" || !/^(oidc|saml):/.test(provider)) return null;
+        return { actor: actorFromClaims(claims, provider), expiresAt: claims.exp * 1000 };
       },
     },
   };
