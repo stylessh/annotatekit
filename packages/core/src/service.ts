@@ -370,7 +370,8 @@ export function createAnnotateKitService(
         );
       }
       // Dismissing closes a thread, so it needs the same permission as resolving.
-      const action = status === "dismissed" ? "thread:resolve" : "thread:update";
+      // Picking up or handing back is open to any writer.
+      const action = status === "dismissed" ? "thread:resolve" : "thread:status";
       const author = await check(actor, action, { thread });
       if (thread.status === status) return thread;
       if (!canTransition(thread.status, status)) {
