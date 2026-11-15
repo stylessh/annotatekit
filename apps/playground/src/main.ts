@@ -5,6 +5,7 @@ import {
   detectBreakpointsFromStylesheets,
 } from "@annotatekit/inspector";
 import { pickBackend } from "./backend.js";
+import "./newsletter.js";
 
 const projectId = "playground";
 const actor: Actor = { kind: "human", id: "usr_playground", name: "Playground user" };

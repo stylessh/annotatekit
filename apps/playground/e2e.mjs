@@ -168,9 +168,41 @@ assert.ok((await shadow(".mark")).length >= 1, "quoted text is underlined");
 if (shots) await page.screenshot({ path: `${shots}/4b-text.png` });
 await clickShadow("[data-action=mode-element]");
 
+// 6c. Inside a web component's open shadow root.
+const subscribeBox = () =>
+  page.evaluate(() => {
+    const btn = document.querySelector("acme-newsletter").shadowRoot.querySelector("button");
+    btn.scrollIntoView({ block: "center" });
+    return btn.getBoundingClientRect().toJSON();
+  });
+let sub = await subscribeBox();
+await page.mouse.move(sub.x + sub.width / 2, sub.y + sub.height / 2);
+assert.match(
+  (await shadow(".label"))[0].text,
+  /^button\.subscribe/,
+  "hover reaches into the shadow root",
+);
+await page.mouse.click(sub.x + sub.width / 2, sub.y + sub.height / 2);
+await page.keyboard.type("Make this match the CTA");
+await page.keyboard.press("Enter");
+d = await draft();
+assert.equal(d.kind, "pin");
+assert.equal(d.anchor.selector, "#newsletter >>> button.subscribe");
+await page.waitForFunction(() => document.querySelectorAll("#threads li").length === 6);
+sub = await subscribeBox();
+const shadowPin = (await shadow(".pin")).at(-1);
+assert.ok(
+  shadowPin.rect.x <= sub.x + sub.width / 2 &&
+    shadowPin.rect.right >= sub.x + sub.width / 2 &&
+    Math.abs(shadowPin.rect.y + 24 - (sub.y + sub.height / 2)) < 4,
+  "pin sits on the shadow button",
+);
+if (shots) await page.screenshot({ path: `${shots}/4c-shadow.png` });
+await page.evaluate(() => window.scrollTo(0, 0));
+
 // 7. Everything was persisted through core's localStorage adapter.
-await page.waitForFunction(() => document.querySelectorAll("#threads li").length === 5);
-assert.equal((await shadow(".pin")).length, 5);
+await page.waitForFunction(() => document.querySelectorAll("#threads li").length === 6);
+assert.equal((await shadow(".pin")).length, 6);
 
 // 8. Pins follow their element on scroll.
 await page.mouse.move(5, 5);
@@ -190,7 +222,7 @@ pins = await page.evaluate(async () => {
   const root = document.querySelector("[data-annotatekit-overlay]").shadowRoot;
   return Array.from(root.querySelectorAll(".pin"), (p) => p.dataset.status);
 });
-assert.deepEqual(pins, ["resolved", "open", "open", "open", "open"]);
+assert.deepEqual(pins, ["resolved", "open", "open", "open", "open", "open"]);
 await page.evaluate(() => window.scrollTo(0, 0));
 const groupPin = (await shadow(".pin"))[1];
 await page.mouse.click(groupPin.rect.x + 12, groupPin.rect.y + 12);
@@ -201,8 +233,8 @@ if (shots) await page.screenshot({ path: `${shots}/5-focused-group.png` });
 // 10. Pins survive a reload, and the breakpoint follows the viewport.
 await page.setViewportSize({ width: 500, height: 800 });
 await page.reload();
-await page.waitForFunction(() => document.querySelectorAll("#threads li").length === 5);
-assert.equal((await shadow(".pin")).length, 5);
+await page.waitForFunction(() => document.querySelectorAll("#threads li").length === 6);
+assert.equal((await shadow(".pin")).length, 6);
 assert.match((await shadow(".bp"))[0].text, /^base · 500px$/);
 if (shots) await page.screenshot({ path: `${shots}/6-mobile.png` });
 

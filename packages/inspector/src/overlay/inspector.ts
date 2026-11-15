@@ -1,4 +1,10 @@
 import type { Point } from "@annotatekit/core";
+import {
+  composedChildren,
+  composedContains,
+  composedParent,
+  deepElementFromPoint,
+} from "../capture/scope.js";
 import { resolveAnchor } from "../capture/selector.js";
 import { type CaptureOptions, Capturer } from "../capture/snapshot.js";
 import { quoteFromRange, rangeFromQuote } from "../capture/text-range.js";
@@ -111,7 +117,7 @@ function unionRect(rects: DOMRect[]): Box {
 function commonAncestor(els: Element[]): Element | null {
   const [first, ...rest] = els;
   let node: Element | null = first ?? null;
-  while (node && !rest.every((e) => node?.contains(e))) node = node.parentElement;
+  while (node && !rest.every((e) => node && composedContains(node, e))) node = composedParent(node);
   return node;
 }
 
@@ -254,7 +260,8 @@ export function createInspector(options: InspectorOptions = {}): Inspector {
   function pickAt(x: number, y: number): Element | null {
     // The host is pointer-events:none except for its controls, so this returns
     // page content unless the pointer is over our toolbar, pins or composer.
-    const el = doc.elementFromPoint(x, y);
+    // Descends into open shadow roots, so web components' insides are pickable.
+    const el = deepElementFromPoint(doc, x, y, isOwn);
     if (!el || isOwn(el) || isIgnored(el)) return null;
     return el;
   }
@@ -647,27 +654,28 @@ export function createInspector(options: InspectorOptions = {}): Inspector {
     const right = box.left + box.width;
     const bottom = box.top + box.height;
     const out: Element[] = [];
-    const walker = doc.createTreeWalker(doc.body, NodeFilter.SHOW_ELEMENT, {
-      acceptNode: (node) => {
-        const el = node as Element;
-        if (isOwn(el) || isIgnored(el)) return NodeFilter.FILTER_REJECT;
-        const r = el.getBoundingClientRect();
-        if (r.width === 0 && r.height === 0) return NodeFilter.FILTER_SKIP;
+    // Walk by hand rather than with a TreeWalker, which can't enter shadow roots.
+    const visit = (el: Element) => {
+      if (out.length >= MAX_AREA_TARGETS || isOwn(el) || isIgnored(el)) return;
+      const r = el.getBoundingClientRect();
+      const empty = r.width === 0 && r.height === 0;
+      if (!empty) {
         if (r.right < box.left || r.left > right || r.bottom < box.top || r.top > bottom) {
-          return NodeFilter.FILTER_REJECT; // no overlap, so (overflow aside) no child is inside
+          return; // no overlap, so (overflow aside) no child is inside
         }
         const inside =
           r.left >= box.left - 1 &&
           r.top >= box.top - 1 &&
           r.right <= right + 1 &&
           r.bottom <= bottom + 1;
-        return inside ? NodeFilter.FILTER_ACCEPT : NodeFilter.FILTER_SKIP;
-      },
-    });
-    for (let n = walker.nextNode(); n && out.length < MAX_AREA_TARGETS; n = walker.nextNode()) {
-      const el = n as Element;
-      if (!out.some((o) => o.contains(el))) out.push(el); // outermost elements only
-    }
+        if (inside) {
+          out.push(el); // outermost elements only
+          return;
+        }
+      }
+      for (const child of composedChildren(el)) visit(child);
+    };
+    for (const child of composedChildren(doc.body)) visit(child);
     return out;
   }
 

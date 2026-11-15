@@ -17,6 +17,12 @@ styles into the page.
   The quote is stored in `annotation.metadata.inspector.quote`, the overlay
   underlines it again on reload, and MCP's `get_annotation_context` returns it
   as `selectedText`. `quoteFromRange` and `rangeFromQuote` are exported too.
+- **Web components**: hovering, clicking and boxing reach into open shadow
+  roots. Selectors cross into one with `>>>`, as in
+  `#newsletter >>> button.subscribe` (the host, then the element inside its
+  shadow root). `queryDeep(document, selector)` resolves them. Elements in a
+  shadow root get no `xpath`, since XPath can't enter one. Closed shadow roots
+  stay opaque: the host is what you annotate.
 - **Context**: each draft carries core's `CaptureContext`: viewport, the named
   breakpoint, color scheme, and the detected CSS system with the element's
   utility classes and the CSS variables its rules use.
