@@ -1,0 +1,33 @@
+{
+  "name": "@annotatekit/auth",
+  "version": "0.0.0",
+  "license": "MIT",
+  "description": "Authentication, whitelisting and permissions for AnnotateKit: whitelist rules, role mapping, host tokens, shared passwords, agent API keys and a server-side request guard.",
+  "type": "module",
+  "sideEffects": false,
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "@annotatekit/source": "./src/index.ts",
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "dependencies": {
+    "@annotatekit/core": "workspace:*"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/stylessh/annotatekit.git",
+    "directory": "packages/auth"
+  }
+}

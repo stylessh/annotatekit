@@ -1,5 +1,6 @@
 export * from "./adapters/auth.js";
 export * from "./adapters/resolution.js";
+export * from "./adapters/scopes.js";
 export * from "./adapters/storage.js";
 export * from "./adapters/whitelist.js";
 export * from "./anchor/breakpoints.js";

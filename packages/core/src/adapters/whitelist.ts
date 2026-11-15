@@ -10,6 +10,10 @@ export interface WhitelistContext {
 
 export interface WhitelistDecision {
   allowed: boolean;
+  /** Allowed to see threads but not to write. Only meaningful when `allowed` is `true`. */
+  readOnly?: boolean;
+  /** Denied only because nobody is signed in, so the UI can offer a sign-in button. */
+  signIn?: boolean;
   reason?: string;
 }
 
@@ -61,7 +65,9 @@ export function createStaticWhitelist(options: StaticWhitelistOptions = {}): Whi
         };
       }
       if (!actor) {
-        return allowAnonymous ? { allowed: true } : { allowed: false, reason: "Sign-in required" };
+        return allowAnonymous
+          ? { allowed: true }
+          : { allowed: false, signIn: true, reason: "Sign-in required" };
       }
       if (options.allowActor && !options.allowActor(actor)) {
         return { allowed: false, reason: `Actor ${actor.id} is not whitelisted` };
