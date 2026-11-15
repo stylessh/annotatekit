@@ -65,6 +65,27 @@ const { items, nextCursor } = await storage.threads.list({
 storage.subscribe((change) => console.log(change.type, change.collection, change.id));
 ```
 
+## Service
+
+`createAnnotateKitService({ storage, resolution?, authorize? })` is the rules
+layer every renderer, server and MCP tool calls instead of writing to storage
+directly. It generates ids and timestamps, checks permissions through the
+optional `authorize` callback, keeps `commentCount` in step, enforces status
+transitions and runs the resolution adapter (review by default, so agent fixes
+land in `pending_review`). Status changes, resolves and reopens post a plain
+system comment with `metadata.system = true`, so the thread shows who did what.
+
+```ts
+const service = createAnnotateKitService({ storage });
+const { thread } = await service.createThread(actor, {
+  projectId: "shop",
+  page: pageContextFromUrl(location.href, document.title),
+  annotation: { kind: "pin", anchor, position: { x: 0.5, y: 0.5 }, context },
+  comment: { body: "Padding is off on tablet" },
+});
+await service.resolveThread(agent, thread.id, { note: "Matched card padding" });
+```
+
 ### Writing a storage adapter
 
 Each collection has `get`, `list`, `put` (upsert) and `delete`. Adapters must
