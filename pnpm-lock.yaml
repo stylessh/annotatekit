@@ -21,7 +21,26 @@ importers:
         specifier: 5.1.0
         version: 5.1.0(@types/node@22.20.5)(vite@8.3.8(@types/node@22.20.5))
 
+  packages/client:
+    dependencies:
+      '@annotatekit/core':
+        specifier: workspace:*
+        version: link:../core
+
   packages/core: {}
+
+  packages/server:
+    dependencies:
+      '@annotatekit/core':
+        specifier: workspace:*
+        version: link:../core
+      '@annotatekit/sqlite':
+        specifier: workspace:*
+        version: link:../sqlite
+    devDependencies:
+      '@annotatekit/client':
+        specifier: workspace:*
+        version: link:../client
 
   packages/sqlite:
     dependencies:
