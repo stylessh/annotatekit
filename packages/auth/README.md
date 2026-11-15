@@ -64,7 +64,7 @@ createAnnotateKitServer({ storage, auth, audit, mount: { "/v1/keys": keys } });
 createInspector({ apiKeys: createAnnotateKitClient({ baseUrl, token }).apiKeys });
 ```
 
-The toolbar's Keys panel lists your keys, mints one (name, permissions, 7 days to 1 year) and shows it once with a copy button, and revokes keys with a confirm click. Minting needs `project:admin` by default. Pass `mintScope: "annotations:write"` to let every commenter connect their own agent. Keys never carry more than the minter holds. Admins can switch to everyone's keys and revoke any of them. Agents and shared-password guests can't manage keys. Mints and revokes go to the audit log as `apikey:mint` and `apikey:revoke`.
+The toolbar's Keys panel lists your keys, mints one (name, permissions, 7 days to 1 year) and shows it once with a copy button, and revokes keys with a confirm click. Anyone who can comment can mint a key for their own agent, so feedback can turn into work without waiting on someone else. A key never carries more than its creator holds: a commenter's agent can read and comment, and resolving needs a creator with the resolver role. Pass `mintScope: "project:admin"` to keep minting to admins. Admins can switch to everyone's keys and revoke any of them. Agents and shared-password guests can't manage keys. Mints and revokes go to the audit log as `apikey:mint` and `apikey:revoke`.
 
 ## Putting it together
 

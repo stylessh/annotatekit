@@ -339,10 +339,17 @@ describe("request guard", () => {
       ok: true,
       actor: { kind: "agent", onBehalfOf: "usr_alan" },
     });
+    // Without annotations:resolve the agent only closes what Alan opened, as Alan could.
     expect(
       await guard.check(bearer(key), {
         action: "thread:resolve",
         thread: { createdBy: alan } as Thread,
+      }),
+    ).toMatchObject({ ok: true });
+    expect(
+      await guard.check(bearer(key), {
+        action: "thread:resolve",
+        thread: { createdBy: { kind: "human", id: "usr_bea", name: "Bea" } } as Thread,
       }),
     ).toMatchObject({ ok: false, code: "forbidden" });
   });

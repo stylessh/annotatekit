@@ -20,8 +20,9 @@ export interface ApiKeyHandlerOptions {
   verifier: Verifier;
   roles: RoleMapper;
   /**
-   * The scope someone needs to mint keys. Defaults to `project:admin`. Set
-   * `annotations:write` to let every commenter connect their own agent.
+   * The scope someone needs to mint keys. Defaults to `annotations:write`, so
+   * every commenter can connect their own agent, which never gets more than
+   * its creator holds. Set `project:admin` to keep minting to admins.
    */
   mintScope?: AuthScope;
   /** Shown in new keys, such as `live` or `test`. Defaults to `live`. */
@@ -46,7 +47,7 @@ const NAME_MAX = 80;
  * so a browser can't send them cross-site without a CORS preflight.
  */
 export function createApiKeyHandler(options: ApiKeyHandlerOptions) {
-  const mintScope = options.mintScope ?? "project:admin";
+  const mintScope = options.mintScope ?? "annotations:write";
   const clock = options.now ?? Date.now;
 
   async function whoami(request: Request) {

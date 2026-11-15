@@ -21,10 +21,10 @@ const SECRET = "test-secret-that-is-at-least-32-bytes-long";
 const admin: HumanActor = { kind: "human", id: "usr_admin", name: "Admin", groups: ["admins"] };
 const dana: HumanActor = { kind: "human", id: "usr_dana", name: "Dana", groups: ["eng"] };
 
-async function setup(mintScope?: "annotations:write") {
+async function setup(mintScope?: "project:admin") {
   const store = createMemoryApiKeyStore();
   const audit = createMemoryAuditLog();
-  const roles = mapGroups({ admin: ["admins"], commenter: ["eng"] });
+  const roles = mapGroups({ admin: ["admins"], commenter: ["eng"], viewer: ["readers"] });
   const guests = sharedPasswordAuth({
     passwordHash: await hashSharedPassword("open sesame"),
     sessionSecret: SECRET,
@@ -96,30 +96,47 @@ describe("createApiKeyHandler", () => {
     });
   });
 
-  it("needs project:admin to mint by default, and never grants more than you hold", async () => {
-    const { clientFor, token, audit } = await setup();
-    const client = clientFor(await token(dana));
-    expect(await client.apiKeys.list()).toEqual({ keys: [], grantable: [], admin: false });
-    await expect(client.apiKeys.create({ scopes: ["annotations:read"] })).rejects.toMatchObject({
-      code: "forbidden",
+  it("lets every commenter mint by default, never past their own role", async () => {
+    const { clientFor, token } = await setup();
+    const commenter = clientFor(await token(dana));
+    expect(await commenter.apiKeys.list()).toEqual({
+      keys: [],
+      grantable: ["annotations:read", "annotations:write"],
+      admin: false,
     });
-    expect((await audit.list())[0]).toMatchObject({ action: "apikey:mint", decision: "deny" });
-
-    const open = await setup("annotations:write");
-    const commenter = open.clientFor(await open.token(dana));
-    expect((await commenter.apiKeys.list()).grantable).toEqual([
-      "annotations:read",
-      "annotations:write",
-    ]);
+    // A commenter's agent can't resolve, because the commenter can't.
     await expect(
       commenter.apiKeys.create({ scopes: ["annotations:resolve"] }),
     ).rejects.toMatchObject({ code: "forbidden" });
-    const { record } = await commenter.apiKeys.create({ scopes: ["annotations:read"] });
+    const { record } = await commenter.apiKeys.create({
+      scopes: ["annotations:read", "annotations:write"],
+    });
     expect(record.name).toBe("Agent");
+
+    // Viewers can't comment, so they can't hand an agent that either.
+    const viewer = clientFor(
+      await token({ kind: "human", id: "usr_view", name: "Viewer", groups: ["readers"] }),
+    );
+    expect((await viewer.apiKeys.list()).grantable).toEqual([]);
+    await expect(viewer.apiKeys.create({ scopes: ["annotations:read"] })).rejects.toMatchObject({
+      code: "forbidden",
+    });
+  });
+
+  it("lets admins turn self-service off with mintScope", async () => {
+    const { clientFor, token, audit } = await setup("project:admin");
+    const commenter = clientFor(await token(dana));
+    expect((await commenter.apiKeys.list()).grantable).toEqual([]);
+    await expect(commenter.apiKeys.create({ scopes: ["annotations:read"] })).rejects.toMatchObject({
+      code: "forbidden",
+    });
+    expect((await audit.list())[0]).toMatchObject({ action: "apikey:mint", decision: "deny" });
+    const asAdmin = clientFor(await token(admin));
+    expect((await asAdmin.apiKeys.list()).grantable).toContain("project:admin");
   });
 
   it("keeps people to their own keys unless they are admins", async () => {
-    const { clientFor, token } = await setup("annotations:write");
+    const { clientFor, token } = await setup();
     const asAdmin = clientFor(await token(admin));
     const asDana = clientFor(await token(dana));
     const mine = await asDana.apiKeys.create({ scopes: ["annotations:read"] });
@@ -139,7 +156,7 @@ describe("createApiKeyHandler", () => {
   });
 
   it("refuses guests, anonymous callers and form posts", async () => {
-    const { app, guests, token } = await setup("annotations:write");
+    const { app, guests, token } = await setup();
     const guestToken = (await guests.signIn("open sesame", "Visitor")) as string;
     const post = (headers: Record<string, string>, body = '{"scopes":["annotations:read"]}') =>
       app.fetch(new Request("http://x/v1/keys", { method: "POST", headers, body }));
