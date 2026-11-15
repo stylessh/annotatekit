@@ -11,9 +11,13 @@
   },
   "dependencies": {
     "@annotatekit/inspector": "workspace:*",
-    "@annotatekit/core": "workspace:*"
+    "@annotatekit/core": "workspace:*",
+    "@annotatekit/client": "workspace:*"
   },
   "devDependencies": {
-    "vite": "^8.3.8"
+    "vite": "^8.3.8",
+    "@modelcontextprotocol/sdk": "1.32.2",
+    "@annotatekit/server": "workspace:*",
+    "@annotatekit/mcp": "workspace:*"
   }
 }

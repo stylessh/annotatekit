@@ -135,3 +135,13 @@ a {
   opacity: 0.6;
   text-decoration: line-through;
 }
+.log .backend {
+  margin: 0 0 8px;
+  color: #94a3b8;
+}
+.log #backend[data-kind="server"] {
+  color: #4ade80;
+}
+.log li[data-status="pending_review"] {
+  color: #fbbf24;
+}
