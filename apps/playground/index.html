@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>AnnotateKit playground</title>
+    <link rel="stylesheet" href="/src/styles.css" />
+  </head>
+  <body>
+    <header class="site-header">
+      <a class="logo" href="/">Acme</a>
+      <nav class="flex gap-4 text-sm">
+        <a href="#pricing">Pricing</a><a href="#docs">Docs</a><a href="#blog">Blog</a>
+      </nav>
+    </header>
+    <main>
+      <section class="hero p-8 md:p-16">
+        <h1 class="hero__title">Ship feedback, not screenshots</h1>
+        <p class="hero__lede text-sm md:text-base">
+          Press <kbd>Alt</kbd>+<kbd>A</kbd> or use the toolbar. Click to pin, drag to box an area,
+          hold <kbd>Shift</kbd> and click one element to annotate it whole, or several to group them.
+        </p>
+        <div class="flex gap-2">
+          <button type="button" class="btn btn--primary" data-testid="cta">Get started</button>
+          <button type="button" class="btn">Learn more</button>
+        </div>
+      </section>
+      <section class="grid cards gap-4 p-8" id="pricing">
+        <article class="card"><h3>Starter</h3><p class="price">$0</p></article>
+        <article class="card"><h3>Team</h3><p class="price">$12</p></article>
+        <article class="card"><h3>Scale</h3><p class="price">$49</p></article>
+      </section>
+      <section class="p-8 spacer"><p>Scroll down to check pins stay anchored.</p></section>
+    </main>
+    <aside class="log">
+      <h2>Threads on this page</h2>
+      <ol id="threads"></ol>
+      <h2>Last draft <button type="button" id="clear">Clear all</button></h2>
+      <pre id="out">Nothing yet.</pre>
+    </aside>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>
