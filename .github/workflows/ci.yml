@@ -21,6 +21,21 @@ jobs:
       - run: pnpm test
       - run: pnpm build
 
+  packages:
+    # Packs every public package as `pnpm publish` would and checks the tarballs
+    # with publint and Are The Types Wrong. See scripts/check-packages.mjs.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm build
+      - run: pnpm check:packages
+
   e2e:
     # Drives the playground in headless Chromium against the real REST server
     # and the annotatekit-mcp CLI. See apps/playground/e2e.mjs.

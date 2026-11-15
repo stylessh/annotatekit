@@ -230,6 +230,8 @@ pnpm typecheck   # tsc --noEmit across packages
 pnpm lint        # biome
 pnpm build       # emit ESM + .d.ts to packages/*/dist
 pnpm dev         # server + playground, see above
+pnpm changeset   # describe your change for the next release
+pnpm check:packages  # after build: publint + Are The Types Wrong on packed tarballs
 ```
 
-Requires Node 20+ and pnpm 10.
+Requires Node 20+ and pnpm 10. Releases are manual; see [RELEASING.md](RELEASING.md).

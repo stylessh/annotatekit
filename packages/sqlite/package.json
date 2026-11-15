@@ -1,8 +1,23 @@
 {
   "name": "@annotatekit/sqlite",
   "version": "0.0.0",
-  "license": "MIT",
   "description": "SQLite storage adapter for AnnotateKit, on node:sqlite or better-sqlite3.",
+  "keywords": [
+    "annotatekit",
+    "feedback",
+    "annotations",
+    "sqlite"
+  ],
+  "license": "MIT",
+  "homepage": "https://github.com/stylessh/annotatekit/tree/main/packages/sqlite#readme",
+  "bugs": {
+    "url": "https://github.com/stylessh/annotatekit/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/stylessh/annotatekit.git",
+    "directory": "packages/sqlite"
+  },
   "type": "module",
   "sideEffects": false,
   "main": "./dist/index.js",
@@ -28,9 +43,14 @@
   "dependencies": {
     "@annotatekit/core": "workspace:*"
   },
-  "repository": {
-    "type": "git",
-    "url": "https://github.com/stylessh/annotatekit.git",
-    "directory": "packages/sqlite"
+  "publishConfig": {
+    "access": "public",
+    "exports": {
+      ".": {
+        "types": "./dist/index.d.ts",
+        "import": "./dist/index.js"
+      },
+      "./package.json": "./package.json"
+    }
   }
 }
