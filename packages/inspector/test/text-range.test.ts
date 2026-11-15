@@ -35,7 +35,7 @@ describe("text quotes", () => {
     range.setEnd(b.firstChild as Text, 3);
     const quote = quoteFromRange(p, range);
     expect(quote).toMatchObject({ exact: "quick brown fox", prefix: "The" });
-    expect(quote?.suffix.startsWith("jumps")).toBe(true);
+    expect(quote?.suffix?.startsWith("jumps")).toBe(true);
 
     const found = rangeFromQuote(p, quote as NonNullable<typeof quote>);
     expect(found?.toString().replace(/\s+/g, " ")).toBe("quick brown fox");
@@ -45,7 +45,7 @@ describe("text quotes", () => {
     document.body.innerHTML = `<p id="p">alpha beta gamma. delta beta epsilon.</p>`;
     const p = document.getElementById("p") as Element;
     const quote = quoteFromRange(p, select(p, "beta", 1));
-    expect(quote?.prefix.endsWith("delta")).toBe(true);
+    expect(quote?.prefix?.endsWith("delta")).toBe(true);
     const found = rangeFromQuote(p, quote as NonNullable<typeof quote>);
     expect(found?.startOffset).toBe("alpha beta gamma. delta ".length);
   });
