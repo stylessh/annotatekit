@@ -58,6 +58,9 @@ importers:
         specifier: workspace:*
         version: link:../core
     devDependencies:
+      '@annotatekit/client':
+        specifier: workspace:*
+        version: link:../client
       '@annotatekit/server':
         specifier: workspace:*
         version: link:../server

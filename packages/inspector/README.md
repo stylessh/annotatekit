@@ -77,16 +77,17 @@ inspector.setAnnotations(threads.map((t) => toRenderable(t.thread, t.annotation)
 inspector.focusAnnotation(id); // outline an annotation's region and targets
 ```
 
-| Option                  | Default                                                                                |                                                                                                     |
-| ----------------------- | -------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------- |
-| `active`                | `false`                                                                                | Start in inspect mode.                                                                              |
-| `mode`                  | `"element"`                                                                            | `"area"` ignores clicks; only dragging creates annotations.                                         |
-| `shortcut`              | `"Alt+KeyA"`                                                                           | Toggle shortcut as `Mod+…+KeyboardEvent.code`, or `false`.                                          |
-| `toolbar`               | `true`                                                                                 | Show the floating toolbar with the current breakpoint.                                              |
-| `ignore`                |                                                                                        | Selector for page UI that can't be picked and keeps working while inspecting.                       |
-| `breakpoints`           | Tailwind                                                                               | A core `BreakpointPreset`, such as `bootstrapBreakpoints`, or `detectBreakpointsFromStylesheets()`. |
-| `identifyingAttributes` | `data-testid`, `data-test`, `data-qa`, `data-cy`, `data-component`, `data-annotate-id` | Preferred in selectors.                                                                             |
-| `theme`, `accentColor`  | auto                                                                                   | Overlay appearance.                                                                                 |
+| Option                  | Default                                                                                |                                                                                                       |
+| ----------------------- | -------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------- |
+| `active`                | `false`                                                                                | Start in inspect mode.                                                                                |
+| `mode`                  | `"element"`                                                                            | `"area"` ignores clicks; only dragging creates annotations.                                           |
+| `shortcut`              | `"Alt+KeyA"`                                                                           | Toggle shortcut as `Mod+…+KeyboardEvent.code`, or `false`.                                            |
+| `toolbar`               | `true`                                                                                 | Show the floating toolbar with the current breakpoint.                                                |
+| `ignore`                |                                                                                        | Selector for page UI that can't be picked and keeps working while inspecting.                         |
+| `breakpoints`           | Tailwind                                                                               | A core `BreakpointPreset`, such as `bootstrapBreakpoints`, or `detectBreakpointsFromStylesheets()`.   |
+| `identifyingAttributes` | `data-testid`, `data-test`, `data-qa`, `data-cy`, `data-component`, `data-annotate-id` | Preferred in selectors.                                                                               |
+| `theme`, `accentColor`  | auto                                                                                   | Overlay appearance.                                                                                   |
+| `apiKeys`               |                                                                                        | An `ApiKeyManager`, such as `client.apiKeys`. Adds a Keys button for minting and revoking agent keys. |
 
 Keyboard: the shortcut toggles inspect mode, Enter saves, Shift+Enter adds a
 line, Escape closes the composer, then clears the selection, then exits.

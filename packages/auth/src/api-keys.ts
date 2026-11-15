@@ -1,6 +1,7 @@
 import {
   type AgentActor,
   AnnotateKitError,
+  type ApiKeySummary,
   type AuthScope,
   createId,
   type HumanActor,
@@ -11,20 +12,14 @@ import { bearerToken } from "./jwt.js";
 import type { VerifiedPrincipal, Verifier } from "./verifier.js";
 
 /** A stored API key. The key itself is never stored, only its SHA-256 hash. */
-export interface ApiKeyRecord {
-  id: string;
-  /** The first characters of the key, safe to show in a list. */
-  prefix: string;
+export interface ApiKeyRecord extends ApiKeySummary {
   hash: string;
-  /** Agent display name, such as `Claude Code`. */
-  name: string;
-  /** Id of the human who minted the key; the agent acts on their behalf. */
-  onBehalfOf: string;
-  scopes: AuthScope[];
-  createdAt: number;
-  expiresAt?: number;
-  lastUsedAt?: number;
-  revokedAt?: number;
+}
+
+/** The record without its hash, for showing to people. */
+export function toApiKeySummary(record: ApiKeyRecord): ApiKeySummary {
+  const { hash: _hash, ...summary } = record;
+  return summary;
 }
 
 /** Where API key records live. The SQLite backend implements this too. */
