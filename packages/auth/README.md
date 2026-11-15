@@ -150,6 +150,10 @@ const links = magicLinkAuth({
 
 `createSqliteApiKeyStore(db)` keeps API keys (hashes only) in an `annotatekit_api_keys` table. Pass the same database you use for storage.
 
+## Audit log
+
+`createStandaloneAuth` and `magicLinkAuth` take the same `audit` log as the server and record each session issued or refused (`session:issue`) and each link sent (`magic-link:send`), with the reason a sign-in failed.
+
 ## Guests
 
 Shared-password guests are `comment-only` by default: they read, open threads and comment, but can't edit, resolve or delete. Pass `guestPolicy: "own-threads"` to `createServerAuth`, `createRequestGuard` or `createRoleAuthorizer` to let them manage their own threads.

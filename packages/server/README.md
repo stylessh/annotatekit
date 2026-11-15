@@ -72,5 +72,10 @@ All routes live under `basePath` (default `/v1`). Errors are
 | PATCH  | `/groups/:id`           | `{ name?, color?, description? }`                                                                                           |
 | DELETE | `/groups/:id`           |                                                                                                                             |
 | GET    | `/events`               | Server-sent events (`event: change`, a `StorageChange`), optional `projectId`                                               |
+| GET    | `/audit`                | Admins only, when `audit` is set: `actorId`, `action`, `decision`, `since`, `before`, `limit`                               |
 
 Use `@annotatekit/client` to call it from a browser or another service.
+
+## Audit log
+
+Pass `audit` (for example `createSqliteAuditLog` from `@annotatekit/sqlite`) to record every write and every refused request: who (id, name, provider, and `onBehalfOf` for agents, never email or groups), the action, `allow` / `deny` / `error`, the reason, the target and the page origin. Successful reads aren't recorded. Admins (`audit:read`, granted by `project:admin`) read it at `GET /audit`, newest first. Without `auth.authorize` the route refuses everyone, because nothing could tell who is an admin.

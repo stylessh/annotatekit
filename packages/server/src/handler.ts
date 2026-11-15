@@ -3,6 +3,11 @@ import {
   AnnotateKitError,
   type AnnotateKitErrorCode,
   type AnnotateKitService,
+  type AuditDecision,
+  type AuditEventInput,
+  type AuditLog,
+  type AuditQuery,
+  auditActor,
   createAnnotateKitService,
   isAnnotateKitError,
   type ResolutionAdapter,
@@ -45,6 +50,11 @@ export interface AnnotateKitServerOptions {
   maxBodyBytes?: number;
   /** Heartbeat interval for `/events` in ms. Defaults to 25 s. */
   heartbeatMs?: number;
+  /**
+   * Records every write and every refused request, and serves them to admins
+   * at `GET <basePath>/audit`. Use `createSqliteAuditLog` for a durable one.
+   */
+  audit?: AuditLog;
 }
 
 export interface AnnotateKitServer {
@@ -74,8 +84,20 @@ interface Ctx {
 type Route = {
   method: string;
   pattern: RegExp;
+  /** What the audit log calls this route. */
+  action: string;
+  /** What the first path parameter names, for the audit log. */
+  target?: string;
   run: (ctx: Ctx) => Promise<Response>;
 };
+
+/** What a request did, filled in as it is handled, for the audit log. */
+interface Trace {
+  action?: string;
+  target?: { type: string; id: string };
+  actor: Actor | null;
+  reason?: string;
+}
 
 export function createAnnotateKitServer(options: AnnotateKitServerOptions): AnnotateKitServer {
   const service =
@@ -102,34 +124,36 @@ export function createAnnotateKitServer(options: AnnotateKitServerOptions): Anno
 
   const id = "([^/]+)";
   const routes: Route[] = [
-    route("GET", "/health", async () => json({ ok: true, events: Boolean(service.subscribe) })),
-    route("GET", "/me", async ({ actor }) => json({ actor })),
-    route("GET", "/threads", async ({ actor, url }) =>
+    route("GET", "/health", "health", async () =>
+      json({ ok: true, events: Boolean(service.subscribe) }),
+    ),
+    route("GET", "/me", "me", async ({ actor }) => json({ actor })),
+    route("GET", "/threads", "thread:read", async ({ actor, url }) =>
       json(await service.listThreads(actor, threadQuery(url.searchParams))),
     ),
-    route("POST", "/threads", async (ctx) =>
+    route("POST", "/threads", "thread:create", async (ctx) =>
       json(await service.createThread(ctx.actor, await body(ctx)), 201),
     ),
-    route("GET", `/threads/${id}`, async ({ actor, params }) =>
+    route("GET", `/threads/${id}`, "thread:read", async ({ actor, params }) =>
       json(await service.getThread(actor, p(params))),
     ),
-    route("PATCH", `/threads/${id}`, async (ctx) =>
+    route("PATCH", `/threads/${id}`, "thread:update", async (ctx) =>
       json(await service.updateThread(ctx.actor, p(ctx.params), await body(ctx))),
     ),
-    route("DELETE", `/threads/${id}`, async ({ actor, params }) => {
+    route("DELETE", `/threads/${id}`, "thread:delete", async ({ actor, params }) => {
       await service.deleteThread(actor, p(params));
       return new Response(null, { status: 204 });
     }),
-    route("POST", `/threads/${id}/status`, async (ctx) =>
+    route("POST", `/threads/${id}/status`, "thread:status", async (ctx) =>
       json(await service.setThreadStatus(ctx.actor, p(ctx.params), await body(ctx))),
     ),
-    route("POST", `/threads/${id}/resolve`, async (ctx) =>
+    route("POST", `/threads/${id}/resolve`, "thread:resolve", async (ctx) =>
       json(await service.resolveThread(ctx.actor, p(ctx.params), await body(ctx, true))),
     ),
-    route("POST", `/threads/${id}/reopen`, async (ctx) =>
+    route("POST", `/threads/${id}/reopen`, "thread:reopen", async (ctx) =>
       json(await service.reopenThread(ctx.actor, p(ctx.params), await body(ctx, true))),
     ),
-    route("GET", `/threads/${id}/comments`, async ({ actor, params, url }) =>
+    route("GET", `/threads/${id}/comments`, "thread:read", async ({ actor, params, url }) =>
       json(
         await service.listComments(actor, {
           threadId: p(params),
@@ -137,37 +161,51 @@ export function createAnnotateKitServer(options: AnnotateKitServerOptions): Anno
         }),
       ),
     ),
-    route("POST", `/threads/${id}/comments`, async (ctx) =>
+    route("POST", `/threads/${id}/comments`, "comment:create", async (ctx) =>
       json(await service.addComment(ctx.actor, p(ctx.params), await body(ctx)), 201),
     ),
-    route("PATCH", `/comments/${id}`, async (ctx) =>
+    route("PATCH", `/comments/${id}`, "comment:update", async (ctx) =>
       json(await service.updateComment(ctx.actor, p(ctx.params), await body(ctx))),
     ),
-    route("DELETE", `/comments/${id}`, async ({ actor, params }) => {
+    route("DELETE", `/comments/${id}`, "comment:delete", async ({ actor, params }) => {
       await service.deleteComment(actor, p(params));
       return new Response(null, { status: 204 });
     }),
-    route("GET", "/groups", async ({ actor, url }) => {
+    route("GET", "/groups", "group:read", async ({ actor, url }) => {
       const query: Parameters<AnnotateKitService["listGroups"]>[1] = pageQuery(url.searchParams);
       const projectId = url.searchParams.get("projectId");
       if (projectId) query.projectId = projectId;
       return json(await service.listGroups(actor, query));
     }),
-    route("POST", "/groups", async (ctx) =>
+    route("POST", "/groups", "group:create", async (ctx) =>
       json(await service.createGroup(ctx.actor, await body(ctx)), 201),
     ),
-    route("PATCH", `/groups/${id}`, async (ctx) =>
+    route("PATCH", `/groups/${id}`, "group:update", async (ctx) =>
       json(await service.updateGroup(ctx.actor, p(ctx.params), await body(ctx))),
     ),
-    route("DELETE", `/groups/${id}`, async ({ actor, params }) => {
+    route("DELETE", `/groups/${id}`, "group:delete", async ({ actor, params }) => {
       await service.deleteGroup(actor, p(params));
       return new Response(null, { status: 204 });
     }),
-    route("GET", "/events", async (ctx) => events(ctx)),
+    route("GET", "/events", "thread:read", async (ctx) => events(ctx)),
+    route("GET", "/audit", "audit:read", async ({ actor, url }) => {
+      const audit = options.audit;
+      if (!audit) throw new AnnotateKitError("not_found", "No audit log is configured");
+      if (!actor) throw new AnnotateKitError("unauthorized", "Sign in to read the audit log");
+      // Without an authorizer anyone signed in could read it, so refuse instead.
+      const allowed = await options.auth.authorize?.({ actor, action: "audit:read" });
+      if (allowed !== true) {
+        throw new AnnotateKitError("forbidden", "Only project admins may read the audit log");
+      }
+      return json({ events: await audit.list(auditQuery(url.searchParams)) });
+    }),
   ];
 
-  function route(method: string, path: string, run: Route["run"]): Route {
-    return { method, pattern: new RegExp(`^${path}$`), run };
+  function route(method: string, path: string, action: string, run: Route["run"]): Route {
+    const r: Route = { method, pattern: new RegExp(`^${path}$`), action, run };
+    const target = /^\/(threads|comments|groups)\/\(/.exec(path)?.[1];
+    if (target) r.target = target.slice(0, -1);
+    return r;
   }
 
   async function body<T>(ctx: Ctx, optional = false): Promise<T> {
@@ -296,7 +334,7 @@ export function createAnnotateKitServer(options: AnnotateKitServerOptions): Anno
     }
   }
 
-  async function dispatch(request: Request): Promise<Response> {
+  async function dispatch(request: Request, trace: Trace): Promise<Response> {
     const url = new URL(request.url);
     for (const [prefix, handler] of mounts) {
       if (url.pathname === prefix || url.pathname.startsWith(`${prefix}/`)) {
@@ -316,14 +354,13 @@ export function createAnnotateKitServer(options: AnnotateKitServerOptions): Anno
         methodMismatch = true;
         continue;
       }
+      const params = match.slice(1).map((s) => decodeURIComponent(s));
+      trace.action = r.action;
+      if (r.target && params[0]) trace.target = { type: r.target, id: params[0] };
       const actor = await options.auth.authenticate(request);
+      trace.actor = actor;
       await checkWhitelist(request, actor);
-      return r.run({
-        request,
-        url,
-        actor,
-        params: match.slice(1).map((s) => decodeURIComponent(s)),
-      });
+      return r.run({ request, url, actor, params });
     }
     if (methodMismatch) {
       return json({ error: { code: "method_not_allowed", message: "Method not allowed" } }, 405);
@@ -335,11 +372,14 @@ export function createAnnotateKitServer(options: AnnotateKitServerOptions): Anno
     service,
     async fetch(request) {
       let response: Response;
+      const trace: Trace = { actor: null };
       try {
-        response = await dispatch(request);
+        response = await dispatch(request, trace);
       } catch (error) {
+        if (isAnnotateKitError(error)) trace.reason = error.message;
         response = toErrorResponse(error);
       }
+      if (options.audit) await recordAudit(options.audit, request, response.status, trace);
       const cors = corsHeaders(request);
       if ([...cors.keys()].length === 0) return response;
       const headers = new Headers(response.headers);
@@ -353,6 +393,48 @@ export function createAnnotateKitServer(options: AnnotateKitServerOptions): Anno
       });
     },
   };
+}
+
+/** Writes, refusals and audit reads are recorded; plain reads that succeed are not. */
+async function recordAudit(audit: AuditLog, request: Request, status: number, trace: Trace) {
+  if (!trace.action) return;
+  const write = request.method !== "GET" && request.method !== "HEAD";
+  const decision: AuditDecision =
+    status === 401 || status === 403 ? "deny" : status >= 400 ? "error" : "allow";
+  if (!write && decision !== "deny" && trace.action !== "audit:read") return;
+  const event: AuditEventInput = {
+    actor: auditActor(trace.actor),
+    action: trace.action,
+    decision,
+    status,
+  };
+  if (trace.reason) event.reason = trace.reason;
+  if (trace.target) event.target = trace.target;
+  const origin = request.headers.get("origin");
+  if (origin && origin !== "null") event.origin = origin;
+  try {
+    await audit.record(event);
+  } catch (error) {
+    console.error("[annotatekit] could not write the audit log", error);
+  }
+}
+
+function auditQuery(params: URLSearchParams): AuditQuery {
+  const query: AuditQuery = {};
+  for (const key of ["actorId", "action", "since", "before"] as const) {
+    const value = params.get(key);
+    if (value) query[key] = value;
+  }
+  const decision = params.get("decision");
+  if (decision) {
+    if (decision !== "allow" && decision !== "deny" && decision !== "error") {
+      throw new AnnotateKitError("invalid_input", `Unknown decision: ${decision}`);
+    }
+    query.decision = decision;
+  }
+  const limit = pageQuery(params).limit;
+  if (limit !== undefined) query.limit = limit;
+  return query;
 }
 
 function p(params: string[]): string {

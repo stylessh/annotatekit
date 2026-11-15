@@ -18,6 +18,7 @@ import {
 } from "@annotatekit/core";
 import { openDatabase, type SqliteDatabase } from "./driver.js";
 
+export * from "./audit.js";
 export type { SqliteDatabase, SqliteStatement } from "./driver.js";
 export { openDatabase } from "./driver.js";
 

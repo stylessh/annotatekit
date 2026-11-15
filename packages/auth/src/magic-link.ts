@@ -1,3 +1,5 @@
+import type { AuditLog } from "@annotatekit/core";
+import { recordAudit } from "./audit.js";
 import { actorFromClaims, DEFAULT_AUDIENCE } from "./host.js";
 import { bearerToken, signToken, verifyToken } from "./jwt.js";
 import type { Verifier } from "./verifier.js";
@@ -64,6 +66,8 @@ export interface MagicLinkOptions {
   /** Session lifetime in seconds. Defaults to 8 hours. */
   sessionTtlSeconds?: number;
   issuer?: string;
+  /** Records links sent (`magic-link:send`) and sessions issued or refused (`session:issue`). */
+  audit?: AuditLog;
   now?: () => number;
 }
 
@@ -114,7 +118,16 @@ export function magicLinkAuth(options: MagicLinkOptions): MagicLinkAuth {
       return text(403, "This site may not sign in to AnnotateKit");
     }
     const domain = email.split("@").pop() ?? "";
-    if (domains && !domains.includes(domain)) return accepted();
+    if (domains && !domains.includes(domain)) {
+      await recordAudit(options.audit, {
+        actor: null,
+        action: "magic-link:send",
+        decision: "deny",
+        reason: `Email domain ${domain} may not sign in`,
+        origin: returnTo.origin,
+      });
+      return accepted();
+    }
 
     const token = await signToken(
       { iss: issuer, aud: linkAudience, sub: email, returnTo: returnTo.toString() },
@@ -126,6 +139,13 @@ export function magicLinkAuth(options: MagicLinkOptions): MagicLinkAuth {
       url,
       expiresAt: clock() + linkTtl * 1000,
       origin: returnTo.origin,
+    });
+    await recordAudit(options.audit, {
+      actor: null,
+      action: "magic-link:send",
+      decision: "allow",
+      origin: returnTo.origin,
+      details: { domain },
     });
     return accepted();
   }
@@ -143,6 +163,14 @@ export function magicLinkAuth(options: MagicLinkOptions): MagicLinkAuth {
       return text(400, "This link is invalid or has expired. Ask for a new one.");
     }
     if (!(await used.claim(claims.jti, claims.exp * 1000, clock()))) {
+      await recordAudit(options.audit, {
+        actor: null,
+        action: "session:issue",
+        decision: "deny",
+        reason: "Link already used",
+        origin: returnTo.origin,
+        details: { provider: PROVIDER },
+      });
       return text(400, "This link was already used. Ask for a new one.");
     }
     const email = claims.sub;
@@ -158,6 +186,18 @@ export function magicLinkAuth(options: MagicLinkOptions): MagicLinkAuth {
       },
       { secret: options.sessionSecret, ttlSeconds: sessionTtl, ...now },
     );
+    await recordAudit(options.audit, {
+      actor: {
+        kind: "human",
+        id: `email|${email}`,
+        name: email.split("@")[0] ?? email,
+        provider: PROVIDER,
+      },
+      action: "session:issue",
+      decision: "allow",
+      origin: returnTo.origin,
+      details: { provider: PROVIDER },
+    });
     returnTo.hash = `annotatekit_session=${session}`;
     return new Response(null, {
       status: 303,

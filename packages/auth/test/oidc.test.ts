@@ -1,3 +1,4 @@
+import { createMemoryAuditLog } from "@annotatekit/core";
 import { beforeAll, describe, expect, it } from "vitest";
 import { createStandaloneAuth, entra, google, oidc, okta } from "../src/index.js";
 
@@ -186,7 +187,9 @@ describe("oidc provider", () => {
 });
 
 describe("standalone login", () => {
+  const audit = createMemoryAuditLog();
   const auth = createStandaloneAuth({
+    audit,
     providers: [provider()],
     sessionSecret: SECRET,
     baseUrl: "https://ak.example.com/auth",
@@ -253,6 +256,12 @@ describe("standalone login", () => {
       email: "dana@acme.com",
       emailVerified: true,
       provider: "oidc:acme",
+    });
+    expect((await audit.list())[0]).toMatchObject({
+      action: "session:issue",
+      decision: "allow",
+      actor: { id: "acme|00u9", provider: "oidc:acme" },
+      origin: "https://staging.acme.com",
     });
   });
 

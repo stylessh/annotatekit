@@ -1,3 +1,4 @@
+export * from "./adapters/audit.js";
 export * from "./adapters/auth.js";
 export * from "./adapters/resolution.js";
 export * from "./adapters/scopes.js";

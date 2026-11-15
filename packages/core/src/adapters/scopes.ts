@@ -38,7 +38,7 @@ const SCOPE_ACTIONS: Readonly<Record<AuthScope, readonly AuthAction[]>> = {
   "annotations:write": ["thread:create", "comment:create"],
   "annotations:resolve": ["thread:resolve", "thread:update"],
   "annotations:moderate": ["thread:update", "thread:delete", "comment:update", "comment:delete"],
-  "project:admin": ["group:manage"],
+  "project:admin": ["group:manage", "audit:read"],
 };
 
 /** Actions `annotations:write` grants only on threads or comments the actor authored. */
