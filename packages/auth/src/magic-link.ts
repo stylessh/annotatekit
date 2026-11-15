@@ -139,7 +139,7 @@ export function magicLinkAuth(options: MagicLinkOptions): MagicLinkAuth {
       ...now,
     });
     const returnTo = typeof claims?.returnTo === "string" ? safeUrl(claims.returnTo) : null;
-    if (!claims || !claims.jti || !returnTo || !originAllowed(returnTo.origin)) {
+    if (!claims?.jti || !returnTo || !originAllowed(returnTo.origin)) {
       return text(400, "This link is invalid or has expired. Ask for a new one.");
     }
     if (!(await used.claim(claims.jti, claims.exp * 1000, clock()))) {
