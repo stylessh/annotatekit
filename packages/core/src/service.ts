@@ -1,3 +1,4 @@
+import { validateAttachments } from "./adapters/attachments.js";
 import type { AuthAction, AuthorizationRequest } from "./adapters/auth.js";
 import {
   createReviewResolution,
@@ -220,7 +221,9 @@ export function createAnnotateKitService(
   }
 
   async function writeComment(thread: Thread, author: Actor, input: NewCommentInput) {
-    const body = validateBody(input.body);
+    const attachments = validateAttachments(input.attachments);
+    // A comment can be just an attachment, e.g. a screenshot.
+    const body = attachments?.length && !input.body?.trim() ? "" : validateBody(input.body);
     const at = now();
     const comment: Comment = {
       id: createId("cmt"),
@@ -232,7 +235,7 @@ export function createAnnotateKitService(
       updatedAt: at,
     };
     if (input.mentions?.length) comment.mentions = [...input.mentions];
-    if (input.attachments?.length) comment.attachments = structuredClone(input.attachments);
+    if (attachments?.length) comment.attachments = structuredClone(attachments);
     if (input.metadata) comment.metadata = structuredClone(input.metadata);
     const stored = await storage.comments.put(comment);
     await storage.threads.put({

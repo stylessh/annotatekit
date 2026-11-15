@@ -418,6 +418,22 @@ try {
   apiServer.kill();
 }
 
+// The UI playground renders every specimen, and its live overlay opens threads.
+const gallery = await browser.newPage({ viewport: { width: 1280, height: 800 } });
+gallery.on("pageerror", (e) => errors.push(`ui: ${e.message}`));
+await gallery.goto("http://localhost:4317/ui.html?theme=dark");
+await gallery.waitForFunction(() => window.inspector);
+assert.ok((await gallery.locator(".g-specimen").count()) >= 25, "gallery specimens render");
+await gallery.evaluate(() => window.scrollTo(0, document.body.scrollHeight));
+await gallery.waitForTimeout(100);
+await gallery.locator("[data-annotatekit-overlay] .pin").first().click();
+await gallery.waitForSelector("[data-annotatekit-overlay] .panel.thread .msg");
+assert.equal(
+  await gallery.locator("[data-annotatekit-overlay]").getAttribute("data-theme"),
+  "dark",
+);
+await gallery.close();
+
 assert.deepEqual(errors, []);
 await browser.close();
 server.httpServer.close();

@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>AnnotateKit UI</title>
+    <link rel="stylesheet" href="/src/gallery.css" />
+  </head>
+  <body data-theme="light">
+    <header class="g-top">
+      <div class="g-brand">
+        <strong>AnnotateKit UI</strong>
+        <span>Every overlay component and state, with mock data</span>
+      </div>
+      <div class="g-controls">
+        <div class="g-seg" role="radiogroup" aria-label="Theme" id="themes">
+          <button type="button" data-theme="light" aria-pressed="true">Light</button>
+          <button type="button" data-theme="dark">Dark</button>
+          <button type="button" data-theme="vivid">Vivid</button>
+        </div>
+        <div class="g-swatches" role="radiogroup" aria-label="Accent" id="accents"></div>
+      </div>
+    </header>
+    <nav class="g-nav" id="nav"></nav>
+    <main id="gallery"></main>
+    <script type="module" src="/src/gallery.ts"></script>
+  </body>
+</html>

@@ -77,6 +77,8 @@ export interface AnnotationDraft {
   quote?: TextQuote;
   context: CaptureContext;
   page: PageContext;
+  /** Files attached in the composer. Upload them, then pass them as comment attachments. */
+  files?: File[];
 }
 
 /** What the overlay needs to draw an existing annotation as a pin. */

@@ -134,11 +134,21 @@ export interface Annotation {
 
 export type CommentFormat = "markdown" | "plain";
 
+/**
+ * A file, image or link on a comment. `url` is where it lives: an upload
+ * adapter's URL, or an inline `data:` URL. Only `http(s):`, `blob:` and
+ * base64 `data:` URLs are accepted.
+ */
 export interface CommentAttachment {
   kind: "image" | "file" | "link";
   url: string;
   name?: string;
   mimeType?: string;
+  /** Size in bytes. */
+  size?: number;
+  /** Image dimensions in pixels, when known. */
+  width?: number;
+  height?: number;
 }
 
 export interface Comment {

@@ -92,6 +92,30 @@ inspector.focusAnnotation(id); // outline an annotation's region and targets
 Keyboard: the shortcut toggles inspect mode, Enter saves, Shift+Enter adds a
 line, Escape closes the composer, then clears the selection, then exits.
 
+## Threads, replies and attachments
+
+With `bindService`/`bindStorage`, clicking a pin opens its thread in the
+overlay: messages, replies, status changes and actions (resolve, reopen,
+approve). The toolbar's Threads button lists the page's threads. Comments can
+carry images and files (paperclip, paste or drop). They are stored through an
+`AttachmentAdapter` from `@annotatekit/core`; the default keeps them inline as
+`data:` URLs up to 512 KB, so pass your own to upload to S3, R2 or your app:
+
+```ts
+bindService(inspector, {
+  service,
+  projectId: "acme",
+  actor,
+  attachments: { upload: async (file) => ({ kind: "image", url: await myUpload(file) }) },
+});
+```
+
+## Theming
+
+Options: `theme: "light" | "dark" | "vivid" | "auto"` and `accentColor`. Every
+color, radius and font is a CSS variable (`--ak-*`) on the overlay host, so you
+can override any of them. `font: false` skips the bundled Instrument Sans.
+
 ## Capture without the UI
 
 `Capturer` exposes the same capture for agents and tests:
