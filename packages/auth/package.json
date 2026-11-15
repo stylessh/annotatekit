@@ -31,6 +31,7 @@
     "directory": "packages/auth"
   },
   "devDependencies": {
+    "@annotatekit/client": "workspace:*",
     "@annotatekit/server": "workspace:*",
     "@annotatekit/sqlite": "workspace:*"
   }

@@ -165,4 +165,51 @@ button.btn[aria-pressed="true"] { background: color-mix(in srgb, var(--ak-accent
   font: 11px/1 ui-monospace, SFMono-Regular, Menlo, monospace;
   color: var(--ak-muted); padding: 0 8px;
 }
+
+.panel {
+  position: fixed;
+  right: 16px;
+  bottom: 64px;
+  width: min(360px, calc(100vw - 32px));
+  max-height: min(520px, calc(100vh - 96px));
+  overflow: auto;
+  pointer-events: auto;
+  padding: 12px;
+  border-radius: 12px;
+  background: var(--ak-surface);
+  color: var(--ak-fg);
+  border: 1px solid var(--ak-border);
+  box-shadow: var(--ak-shadow);
+}
+.panel-head { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
+.panel-head strong { margin-right: auto; }
+.panel-head .all { color: var(--ak-muted); font-size: 12px; }
+button.btn.icon { padding: 2px 8px; font-size: 16px; line-height: 1; }
+button.btn.danger { background: #dc2626; color: #fff; border-color: transparent; }
+.panel .dim { color: var(--ak-muted); font-size: 12px; }
+.panel code { font: 12px/1.4 ui-monospace, SFMono-Regular, Menlo, monospace; }
+.key-list { list-style: none; margin: 0; padding: 0; }
+.key-list li { display: flex; gap: 8px; align-items: center; padding: 8px 0; border-top: 1px solid var(--ak-border); }
+.key-list li:first-child { border-top: 0; }
+.key-list li[data-inactive] { opacity: .6; }
+.key-list .info { flex: 1; min-width: 0; }
+.key-list .name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.panel .empty { color: var(--ak-muted); margin: 4px 0 8px; }
+.panel .error { color: #dc2626; margin: 0 0 8px; }
+.reveal {
+  margin-bottom: 10px; padding: 8px; border-radius: 8px;
+  background: color-mix(in srgb, var(--ak-accent) 10%, transparent);
+  border: 1px solid color-mix(in srgb, var(--ak-accent) 40%, transparent);
+}
+.reveal p { margin: 0 0 6px; }
+.reveal .key { display: block; margin-bottom: 6px; word-break: break-all; user-select: all; }
+.new-key { margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--ak-border); display: grid; gap: 8px; }
+.new-key input[type="text"], .new-key select {
+  width: 100%; padding: 6px 8px; border-radius: 6px; border: 1px solid var(--ak-border);
+  background: transparent; color: inherit; font: inherit;
+}
+.new-key select { width: auto; flex: 1; }
+.new-key .scopes { display: flex; flex-wrap: wrap; gap: 4px 12px; }
+.new-key .row { display: flex; gap: 8px; align-items: center; }
+.panel input:focus-visible, .panel select:focus-visible { outline: 2px solid var(--ak-accent); outline-offset: 1px; }
 `;

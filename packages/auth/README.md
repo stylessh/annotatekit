@@ -52,6 +52,20 @@ const { key } = await mintApiKey({
 // Show `key` once. Only its SHA-256 hash is stored.
 ```
 
+### Managing keys from the toolbar
+
+`createApiKeyHandler` serves `GET /keys`, `POST /keys` and `DELETE /keys/:id` for the signed-in person. Mount it next to the REST API and hand `client.apiKeys` to the inspector:
+
+```ts
+const keys = createApiKeyHandler({ store, verifier: humans, roles, audit });
+createAnnotateKitServer({ storage, auth, audit, mount: { "/v1/keys": keys } });
+
+// Browser
+createInspector({ apiKeys: createAnnotateKitClient({ baseUrl, token }).apiKeys });
+```
+
+The toolbar's Keys panel lists your keys, mints one (name, permissions, 7 days to 1 year) and shows it once with a copy button, and revokes keys with a confirm click. Minting needs `project:admin` by default. Pass `mintScope: "annotations:write"` to let every commenter connect their own agent. Keys never carry more than the minter holds. Admins can switch to everyone's keys and revoke any of them. Agents and shared-password guests can't manage keys. Mints and revokes go to the audit log as `apikey:mint` and `apikey:revoke`.
+
 ## Putting it together
 
 ```ts

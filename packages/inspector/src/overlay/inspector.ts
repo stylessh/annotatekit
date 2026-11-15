@@ -1,7 +1,8 @@
-import type { Point } from "@annotatekit/core";
+import type { ApiKeyManager, Point } from "@annotatekit/core";
 import { resolveAnchor } from "../capture/selector.js";
 import { type CaptureOptions, Capturer } from "../capture/snapshot.js";
 import type { AnnotationDraft, ElementSnapshot, RenderableAnnotation } from "../types.js";
+import { createKeysPanel, type KeysPanel } from "./keys-panel.js";
 import { OVERLAY_CSS } from "./styles.js";
 
 export type InspectMode = "element" | "area";
@@ -27,6 +28,11 @@ export interface InspectorOptions extends CaptureOptions {
   onCreate?: (draft: AnnotationDraft) => void;
   onSelect?: (id: string) => void;
   onActiveChange?: (active: boolean) => void;
+  /**
+   * Adds a "Keys" button to the toolbar for minting and revoking agent API
+   * keys, e.g. `createAnnotateKitClient(...).apiKeys`.
+   */
+  apiKeys?: ApiKeyManager;
   doc?: Document;
 }
 
@@ -194,9 +200,27 @@ export function createInspector(options: InspectorOptions = {}): Inspector {
   );
   const bpLabel = h("span", { class: "bp", "aria-live": "polite" });
   toolbar.append(toggleBtn, elementBtn, areaBtn, bpLabel);
+  let keysPanel: KeysPanel | null = null;
+  let keysBtn: HTMLButtonElement | null = null;
+  if (options.apiKeys) {
+    keysPanel = createKeysPanel(h, options.apiKeys);
+    keysBtn = h(
+      "button",
+      {
+        type: "button",
+        class: "btn",
+        "data-action": "keys",
+        "aria-pressed": "false",
+        title: "Agent API keys",
+      },
+      "Keys",
+    );
+    toolbar.append(keysBtn);
+  }
   if (options.toolbar === false) toolbar.hidden = true;
 
   shadow.append(style, outlineLayer, selLayer, hl, drag, pinLayer, label, composer, toolbar);
+  if (keysPanel) shadow.append(keysPanel.el);
   (options.container ?? doc.body).append(host);
   const pageStyle = doc.createElement("style");
   pageStyle.setAttribute("data-annotatekit-style", "");
@@ -690,6 +714,13 @@ export function createInspector(options: InspectorOptions = {}): Inspector {
     if (action === "toggle") api.toggle();
     else if (action === "mode-element") api.setMode("element");
     else if (action === "mode-area") api.setMode("area");
+    else if (action === "keys" && keysPanel) {
+      void keysPanel.toggle();
+      keysBtn?.setAttribute("aria-pressed", String(keysPanel.open));
+    }
+  });
+  keysPanel?.el.addEventListener("click", () => {
+    keysBtn?.setAttribute("aria-pressed", String(keysPanel?.open ?? false));
   });
   pinLayer.addEventListener("click", (e) => {
     const id = (e.target as Element).closest(".pin")?.getAttribute("data-id");

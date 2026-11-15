@@ -3,6 +3,9 @@ import {
   AnnotateKitError,
   type AnnotateKitErrorCode,
   type AnnotateKitService,
+  type ApiKeyList,
+  type ApiKeyManager,
+  type ApiKeySummary,
   type Comment,
   type CommentQuery,
   type Group,
@@ -39,6 +42,12 @@ export interface AnnotateKitClient extends AnnotateKitService {
   readonly baseUrl: string;
   /** Live changes over the server's `/events` stream. */
   subscribe(listener: StorageListener, options?: { projectId?: string }): () => void;
+  /**
+   * Agent API keys for the signed-in person, served by `createApiKeyHandler`
+   * from `@annotatekit/auth` at `<baseUrl>/keys`. Pass it to the inspector's
+   * `apiKeys` option to manage keys from the toolbar.
+   */
+  readonly apiKeys: ApiKeyManager;
 }
 
 const KNOWN_CODES = new Set<string>([
@@ -139,6 +148,12 @@ export function createAnnotateKitClient(options: AnnotateKitClientOptions): Anno
     updateGroup: (actor, groupId, input) =>
       call<Group>(actor, "PATCH", `/groups/${id(groupId)}`, input),
     deleteGroup: (actor, groupId) => call<void>(actor, "DELETE", `/groups/${id(groupId)}`),
+    apiKeys: {
+      list: (listOptions = {}) =>
+        call<ApiKeyList>(null, "GET", `/keys${listOptions.all ? "?all=1" : ""}`),
+      create: (input) => call<{ key: string; record: ApiKeySummary }>(null, "POST", "/keys", input),
+      revoke: (keyId) => call<void>(null, "DELETE", `/keys/${id(keyId)}`),
+    },
 
     subscribe(listener, subscribeOptions = {}) {
       let stopped = false;

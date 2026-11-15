@@ -3,6 +3,7 @@ export { reasonOf, recordAudit } from "./audit.js";
 export * from "./guard.js";
 export * from "./host.js";
 export { bearerToken, signToken, type TokenClaims, type TokenInput, verifyToken } from "./jwt.js";
+export * from "./key-handler.js";
 export * from "./magic-link.js";
 export * from "./oidc.js";
 export * from "./roles.js";

@@ -21,3 +21,8 @@ Options: `token` (string or async function, sent as a bearer token),
 `sendActor` (default `true`: sends the per-call actor for servers running dev
 auth), `headers`, `fetch` and `reconnectMs` for the event stream. Errors are
 thrown as `AnnotateKitError` with the server's error code.
+
+`client.apiKeys` lists, mints and revokes agent API keys for the signed-in
+person, against `createApiKeyHandler` from `@annotatekit/auth` mounted at
+`<baseUrl>/keys`. Pass it to the inspector's `apiKeys` option to get the
+toolbar's key panel.
