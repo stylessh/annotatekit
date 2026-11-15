@@ -1,5 +1,6 @@
 import { createTextQuote, type ElementAnchor, normalizeText } from "@annotatekit/core";
 import {
+  clientRect,
   composedParent,
   hostOf,
   queryDeep,
@@ -71,46 +72,52 @@ function segmentFor(el: Element, identifying: readonly string[]): string {
   return tag + stable.map((c) => `.${cssEscape(c)}`).join("") + nthOfType(el);
 }
 
-/** Prefix for an element inside a shadow root: its host's selector and `>>>`. */
-function hostPrefix(el: Element, selectorOf: (host: Element) => string): string {
-  const host = hostOf(el);
+/** Prefix for an element inside a shadow root or frame: its host's selector and `>>>`. */
+function hostPrefix(
+  el: Element,
+  root: Document | undefined,
+  selectorOf: (host: Element) => string,
+): string {
+  const host = hostOf(el, root);
   return host ? selectorOf(host) + SCOPE_SEPARATOR : "";
 }
 
 /**
  * The shortest unique selector found by walking up until the chain is unique.
  * Inside a shadow root it is unique within that root, after the host's selector.
+ * Pass the inspector's document as `root` to also cross out of iframes below it.
  */
 export function uniqueSelector(
   el: Element,
   identifying: readonly string[] = DEFAULT_IDENTIFYING_ATTRIBUTES,
+  root?: Document,
 ): string {
-  const root = scopeOf(el);
-  const prefix = hostPrefix(el, (h) => uniqueSelector(h, identifying));
+  const scope = scopeOf(el);
+  const prefix = hostPrefix(el, root, (h) => uniqueSelector(h, identifying, root));
   const parts: string[] = [];
   let node: Element | null = el;
   while (node && node !== el.ownerDocument.documentElement) {
     const seg = segmentFor(node, identifying);
     parts.unshift(seg);
     const candidate = parts.join(" > ");
-    if (isUnique(root, candidate, el)) return prefix + candidate;
+    if (isUnique(scope, candidate, el)) return prefix + candidate;
     node = node.parentElement;
   }
   return prefix + parts.join(" > ");
 }
 
 /** A purely structural selector (`body > main:nth-of-type(1) > …`) that survives class renames. */
-export function structuralSelector(el: Element): string {
+export function structuralSelector(el: Element, root?: Document): string {
   const parts: string[] = [];
   let node: Element | null = el;
   while (node && node.tagName !== "HTML") {
     parts.unshift(node.tagName.toLowerCase() + nthOfType(node));
     node = node.parentElement;
   }
-  return hostPrefix(el, structuralSelector) + parts.join(" > ");
+  return hostPrefix(el, root, (h) => structuralSelector(h, root)) + parts.join(" > ");
 }
 
-/** XPath can't enter shadow roots, so elements inside one get none. */
+/** XPath can't enter shadow roots or frames, so elements inside one get none. */
 export function xpathFor(el: Element): string {
   const parts: string[] = [];
   let node: Element | null = el;
@@ -141,22 +148,31 @@ export function elementPath(el: Element, depth = 4): string {
   return parts.join(" > ");
 }
 
-export function isFixed(el: Element): boolean {
-  const view = el.ownerDocument.defaultView;
-  if (!view) return false;
+/**
+ * Whether the element stays put when `root` scrolls. Inside a frame, only the
+ * frame's own position counts: fixed content inside it still moves with it.
+ */
+export function isFixed(el: Element, root?: Document): boolean {
+  const top = root ?? el.ownerDocument;
   let node: Element | null = el;
-  while (node && node !== el.ownerDocument.body) {
-    const pos = view.getComputedStyle(node).position;
-    if (pos === "fixed" || pos === "sticky") return true;
-    node = composedParent(node);
+  while (node) {
+    if (node.ownerDocument === top) {
+      if (node === top.body) return false;
+      const pos = top.defaultView?.getComputedStyle(node).position;
+      if (pos === "fixed" || pos === "sticky") return true;
+    }
+    node = composedParent(node, root);
   }
   return false;
 }
 
-/** Element box in document coordinates (viewport rect plus scroll). */
-export function documentRect(el: Element): ElementAnchor["rect"] {
-  const r = el.getBoundingClientRect();
-  const view = el.ownerDocument.defaultView;
+/** Element box in document coordinates (viewport rect plus scroll), in `root` for framed elements. */
+export function documentRect(
+  el: Element,
+  root: Document = el.ownerDocument,
+): ElementAnchor["rect"] {
+  const r = clientRect(el, root);
+  const view = root.defaultView;
   return {
     x: r.left + (view?.scrollX ?? 0),
     y: r.top + (view?.scrollY ?? 0),
@@ -182,6 +198,8 @@ function siblingText(el: Element, dir: "prev" | "next"): string {
 }
 
 export interface AnchorOptions {
+  /** The inspector's document. Elements in iframes below it get selectors that start here. */
+  root?: Document;
   identifyingAttributes?: readonly string[];
   /** Computed style properties to record. */
   styles?: readonly string[];
@@ -189,17 +207,18 @@ export interface AnchorOptions {
 
 export function anchorFor(el: Element, opts: AnchorOptions = {}): ElementAnchor {
   const identifying = opts.identifyingAttributes ?? DEFAULT_IDENTIFYING_ATTRIBUTES;
-  const view = el.ownerDocument.defaultView;
-  const selector = uniqueSelector(el, identifying);
+  const root = opts.root ?? el.ownerDocument;
+  const view = root.defaultView;
+  const selector = uniqueSelector(el, identifying, root);
   const anchor: ElementAnchor = {
     selector,
     tagName: el.tagName.toLowerCase(),
-    rect: documentRect(el),
+    rect: documentRect(el, root),
     scroll: { x: view?.scrollX ?? 0, y: view?.scrollY ?? 0 },
     htmlSnippet: snippet(el),
   };
-  if (!hostOf(el)) anchor.xpath = xpathFor(el);
-  const fallbacks = [structuralSelector(el)].filter((s) => s !== selector);
+  if (!hostOf(el, root)) anchor.xpath = xpathFor(el);
+  const fallbacks = [structuralSelector(el, root)].filter((s) => s !== selector);
   if (fallbacks.length) anchor.fallbackSelectors = fallbacks;
   if (el.id) anchor.elementId = el.id;
   if (el.classList.length) anchor.classList = Array.from(el.classList);
@@ -219,8 +238,9 @@ export function anchorFor(el: Element, opts: AnchorOptions = {}): ElementAnchor 
     });
   }
 
-  if (opts.styles?.length && view) {
-    const computed = view.getComputedStyle(el);
+  const ownView = el.ownerDocument.defaultView;
+  if (opts.styles?.length && ownView) {
+    const computed = ownView.getComputedStyle(el);
     const styles: Record<string, string> = {};
     for (const p of opts.styles) {
       const v = computed.getPropertyValue(p);

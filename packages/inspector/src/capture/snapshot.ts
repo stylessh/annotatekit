@@ -90,8 +90,12 @@ export class Capturer {
   element(el: Element): ElementSnapshot {
     const { index, pageSystems } = this.ensure();
     return {
-      anchor: anchorFor(el, { identifyingAttributes: this.identifying, styles: this.styles }),
-      fixed: isFixed(el),
+      anchor: anchorFor(el, {
+        identifyingAttributes: this.identifying,
+        styles: this.styles,
+        root: this.doc,
+      }),
+      fixed: isFixed(el, this.doc),
       css: cssDetailFor(el, {
         index,
         breakpoints: this.preset.breakpoints,

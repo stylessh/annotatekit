@@ -23,6 +23,11 @@ styles into the page.
   shadow root). `queryDeep(document, selector)` resolves them. Elements in a
   shadow root get no `xpath`, since XPath can't enter one. Closed shadow roots
   stay opaque: the host is what you annotate.
+- **Iframes**: same-origin iframes work the same way. The inspector listens in
+  each frame's document (picking up frames that load later), draws in page
+  coordinates, and writes selectors like `#embed >>> button[data-testid="pay"]`
+  (the iframe, then the element in its document). Cross-origin frames can't be
+  read from the page, so there you annotate the iframe element itself.
 - **Context**: each draft carries core's `CaptureContext`: viewport, the named
   breakpoint, color scheme, and the detected CSS system with the element's
   utility classes and the CSS variables its rules use.
