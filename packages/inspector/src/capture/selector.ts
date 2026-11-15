@@ -1,4 +1,12 @@
 import { createTextQuote, type ElementAnchor, normalizeText } from "@annotatekit/core";
+import {
+  composedParent,
+  hostOf,
+  queryDeep,
+  SCOPE_SEPARATOR,
+  type Scope,
+  scopeOf,
+} from "./scope.js";
 
 /** Same normalisation and truncation as capture, so long texts compare equal. */
 const fingerprintOf = (el: Element) => createTextQuote(el.textContent ?? "").fingerprint;
@@ -33,7 +41,7 @@ export function isUnstableClass(cls: string): boolean {
   );
 }
 
-function isUnique(root: ParentNode, selector: string, el: Element): boolean {
+function isUnique(root: Scope, selector: string, el: Element): boolean {
   try {
     const found = root.querySelectorAll(selector);
     return found.length === 1 && found[0] === el;
@@ -43,7 +51,8 @@ function isUnique(root: ParentNode, selector: string, el: Element): boolean {
 }
 
 function nthOfType(el: Element): string {
-  const parent = el.parentElement;
+  // A shadow root's top-level elements have no parentElement, only the root.
+  const parent = el.parentElement ?? (hostOf(el) ? (el.parentNode as ShadowRoot) : null);
   if (!parent) return "";
   const same = Array.from(parent.children).filter((c) => c.tagName === el.tagName);
   return same.length > 1 ? `:nth-of-type(${same.indexOf(el) + 1})` : "";
@@ -62,22 +71,32 @@ function segmentFor(el: Element, identifying: readonly string[]): string {
   return tag + stable.map((c) => `.${cssEscape(c)}`).join("") + nthOfType(el);
 }
 
-/** The shortest unique selector found by walking up until the chain is unique. */
+/** Prefix for an element inside a shadow root: its host's selector and `>>>`. */
+function hostPrefix(el: Element, selectorOf: (host: Element) => string): string {
+  const host = hostOf(el);
+  return host ? selectorOf(host) + SCOPE_SEPARATOR : "";
+}
+
+/**
+ * The shortest unique selector found by walking up until the chain is unique.
+ * Inside a shadow root it is unique within that root, after the host's selector.
+ */
 export function uniqueSelector(
   el: Element,
   identifying: readonly string[] = DEFAULT_IDENTIFYING_ATTRIBUTES,
 ): string {
-  const root = el.ownerDocument;
+  const root = scopeOf(el);
+  const prefix = hostPrefix(el, (h) => uniqueSelector(h, identifying));
   const parts: string[] = [];
   let node: Element | null = el;
-  while (node && node !== root.documentElement) {
+  while (node && node !== el.ownerDocument.documentElement) {
     const seg = segmentFor(node, identifying);
     parts.unshift(seg);
     const candidate = parts.join(" > ");
-    if (isUnique(root, candidate, el)) return candidate;
+    if (isUnique(root, candidate, el)) return prefix + candidate;
     node = node.parentElement;
   }
-  return parts.join(" > ");
+  return prefix + parts.join(" > ");
 }
 
 /** A purely structural selector (`body > main:nth-of-type(1) > …`) that survives class renames. */
@@ -88,9 +107,10 @@ export function structuralSelector(el: Element): string {
     parts.unshift(node.tagName.toLowerCase() + nthOfType(node));
     node = node.parentElement;
   }
-  return parts.join(" > ");
+  return hostPrefix(el, structuralSelector) + parts.join(" > ");
 }
 
+/** XPath can't enter shadow roots, so elements inside one get none. */
 export function xpathFor(el: Element): string {
   const parts: string[] = [];
   let node: Element | null = el;
@@ -116,7 +136,7 @@ export function elementPath(el: Element, depth = 4): string {
     const tag = node.tagName.toLowerCase();
     const cls = Array.from(node.classList).find((c) => !isUnstableClass(c));
     parts.unshift(node.id ? `${tag}#${node.id}` : cls ? `${tag}.${cls}` : tag);
-    node = node.parentElement;
+    node = composedParent(node);
   }
   return parts.join(" > ");
 }
@@ -128,7 +148,7 @@ export function isFixed(el: Element): boolean {
   while (node && node !== el.ownerDocument.body) {
     const pos = view.getComputedStyle(node).position;
     if (pos === "fixed" || pos === "sticky") return true;
-    node = node.parentElement;
+    node = composedParent(node);
   }
   return false;
 }
@@ -176,9 +196,9 @@ export function anchorFor(el: Element, opts: AnchorOptions = {}): ElementAnchor 
     tagName: el.tagName.toLowerCase(),
     rect: documentRect(el),
     scroll: { x: view?.scrollX ?? 0, y: view?.scrollY ?? 0 },
-    xpath: xpathFor(el),
     htmlSnippet: snippet(el),
   };
+  if (!hostOf(el)) anchor.xpath = xpathFor(el);
   const fallbacks = [structuralSelector(el)].filter((s) => s !== selector);
   if (fallbacks.length) anchor.fallbackSelectors = fallbacks;
   if (el.id) anchor.elementId = el.id;
@@ -211,13 +231,7 @@ export function anchorFor(el: Element, opts: AnchorOptions = {}): ElementAnchor 
   return anchor;
 }
 
-function query(doc: Document, selector: string): Element | null {
-  try {
-    return doc.querySelector(selector);
-  } catch {
-    return null;
-  }
-}
+const query = queryDeep;
 
 /**
  * Find an anchored element again: primary selector, then fallbacks, then an

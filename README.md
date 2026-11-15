@@ -4,18 +4,18 @@ Leave threads, comments and feedback directly on a live website, for humans and 
 
 This is a pnpm workspace. Packages live in `packages/`, demo apps in `apps/`.
 
-| Package                                        | What it is                                                                                                    |
-| ---------------------------------------------- | ------------------------------------------------------------------------------------------------------------- |
-| [`@annotatekit/core`](packages/core)           | Framework-agnostic models, element anchors, adapter interfaces and built-in storage. No DOM framework.        |
-| [`@annotatekit/auth`](packages/auth)           | Whitelist rules, role mapping, host tokens, shared passwords, agent API keys and a server-side request guard. |
-| [`@annotatekit/auth-saml`](packages/auth-saml) | SAML 2.0 sign-in for standalone mode, on `@node-saml/node-saml`.                                              |
-| [`@annotatekit/inspector`](packages/inspector) | Shadow DOM overlay: pick, pin, box and group elements; captures breakpoint and CSS system context.            |
-| [`@annotatekit/react`](packages/react)         | `<AnnotateKitInspector>` and `useInspector` for React 18+.                                                    |
-| [`@annotatekit/vue`](packages/vue)             | `<AnnotateKitInspector>` and `useInspector` for Vue 3.                                                        |
-| [`@annotatekit/sqlite`](packages/sqlite)       | SQLite storage adapter on `node:sqlite` or `better-sqlite3`.                                                  |
-| [`@annotatekit/server`](packages/server)       | REST API, live events and the `annotatekit-server` CLI.                                                       |
-| [`@annotatekit/client`](packages/client)       | HTTP client for the server, implementing the core service interface.                                          |
-| [`@annotatekit/mcp`](packages/mcp)             | MCP server for coding agents: read feedback, get element context, reply, resolve.                             |
+| Package                                        | What it is                                                                                                     |
+| ---------------------------------------------- | -------------------------------------------------------------------------------------------------------------- |
+| [`@annotatekit/core`](packages/core)           | Framework-agnostic models, element anchors, adapter interfaces and built-in storage. No DOM framework.         |
+| [`@annotatekit/auth`](packages/auth)           | Whitelist rules, role mapping, host tokens, shared passwords, agent API keys and a server-side request guard.  |
+| [`@annotatekit/auth-saml`](packages/auth-saml) | SAML 2.0 sign-in for standalone mode, on `@node-saml/node-saml`.                                               |
+| [`@annotatekit/inspector`](packages/inspector) | Shadow DOM overlay: pick, pin, box and group elements, quote text; captures breakpoint and CSS system context. |
+| [`@annotatekit/react`](packages/react)         | `<AnnotateKitInspector>` and `useInspector` for React 18+.                                                     |
+| [`@annotatekit/vue`](packages/vue)             | `<AnnotateKitInspector>` and `useInspector` for Vue 3.                                                         |
+| [`@annotatekit/sqlite`](packages/sqlite)       | SQLite storage adapter on `node:sqlite` or `better-sqlite3`.                                                   |
+| [`@annotatekit/server`](packages/server)       | REST API, live events and the `annotatekit-server` CLI.                                                        |
+| [`@annotatekit/client`](packages/client)       | HTTP client for the server, implementing the core service interface.                                           |
+| [`@annotatekit/mcp`](packages/mcp)             | MCP server for coding agents: read feedback, get element context, reply, resolve.                              |
 
 ## Try the whole loop locally
 

@@ -11,6 +11,18 @@ styles into the page.
   all of them (`kind: "region"`, anchored to their closest common ancestor, with
   every element in `targets`).
 - **Boxes**: drag to draw a region; the elements fully inside become `targets`.
+- **Text**: switch the toolbar to Text and select part of a sentence. The draft
+  is a `region` anchored to the element holding the selection, with a `quote`
+  (core's `TextQuote`: the exact text plus up to 32 characters either side).
+  The quote is stored in `annotation.metadata.inspector.quote`, the overlay
+  underlines it again on reload, and MCP's `get_annotation_context` returns it
+  as `selectedText`. `quoteFromRange` and `rangeFromQuote` are exported too.
+- **Web components**: hovering, clicking and boxing reach into open shadow
+  roots. Selectors cross into one with `>>>`, as in
+  `#newsletter >>> button.subscribe` (the host, then the element inside its
+  shadow root). `queryDeep(document, selector)` resolves them. Elements in a
+  shadow root get no `xpath`, since XPath can't enter one. Closed shadow roots
+  stay opaque: the host is what you annotate.
 - **Context**: each draft carries core's `CaptureContext`: viewport, the named
   breakpoint, color scheme, and the detected CSS system with the element's
   utility classes and the CSS variables its rules use.

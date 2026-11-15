@@ -14,6 +14,7 @@ export {
   splitVariants,
   tailwindInfo,
 } from "./capture/css-system.js";
+export { deepElementFromPoint, queryDeep, SCOPE_SEPARATOR } from "./capture/scope.js";
 export {
   type AnchorOptions,
   anchorFor,
@@ -28,6 +29,7 @@ export {
   xpathFor,
 } from "./capture/selector.js";
 export { CAPTURED_STYLES, type CaptureOptions, Capturer } from "./capture/snapshot.js";
+export { quoteFromRange, rangeFromQuote } from "./capture/text-range.js";
 export {
   createInspector,
   draftToRenderable,
