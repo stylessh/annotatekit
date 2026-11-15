@@ -8,6 +8,7 @@ export * from "./anchor/types.js";
 export * from "./errors.js";
 export * from "./ids.js";
 export * from "./models.js";
+export * from "./service.js";
 export * from "./status.js";
 export * from "./storage/local-storage.js";
 export * from "./storage/memory.js";
