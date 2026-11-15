@@ -1,4 +1,5 @@
 ---
+
 "@annotatekit/auth": minor
 "@annotatekit/core": minor
 ---
