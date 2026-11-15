@@ -286,6 +286,42 @@ assert.equal(await page.evaluate(() => window.inspector.active), false);
 await page.evaluate(() => window.inspector.destroy());
 assert.equal(await page.locator("[data-annotatekit-overlay]").count(), 0);
 
+// 11b. The drop-in script tag on a plain page: nothing but one <script>.
+// Served by the playground's Vite plugin; query parameters become data attributes.
+const embedPage = async (params) => {
+  const p = await browser.newPage({ viewport: { width: 1280, height: 800 } });
+  p.on("pageerror", (e) => errors.push(e.message));
+  await p.goto(`http://localhost:4317/embed/?${new URLSearchParams(params)}`);
+  await p.waitForFunction(() => window.AnnotateKit?.instance);
+  return p;
+};
+const annotateBuy = async (p, text) => {
+  await p.keyboard.press("Alt+KeyA");
+  const b = await p.locator("#buy").boundingBox();
+  await p.mouse.click(b.x + b.width / 2, b.y + b.height / 2);
+  await p.keyboard.type(text);
+  await p.keyboard.press("Enter");
+};
+const embedPins = (p) =>
+  p.evaluate(() => {
+    const root = document.querySelector("[data-annotatekit-overlay]").shadowRoot;
+    return root.querySelectorAll(".pin").length;
+  });
+let plain = await embedPage({ "user-name": "Visitor A" });
+assert.equal(await plain.evaluate(() => window.AnnotateKit.instance.backend), "local");
+await annotateBuy(plain, "Make this bigger");
+await plain.waitForFunction(() =>
+  (localStorage.getItem("annotatekit:plain-site") ?? "").includes("Make this bigger"),
+);
+await plain.reload();
+await plain.waitForFunction(() => window.AnnotateKit?.instance);
+await plain.waitForFunction(() => {
+  const root = document.querySelector("[data-annotatekit-overlay]")?.shadowRoot;
+  return root?.querySelectorAll(".pin").length === 1;
+});
+if (shots) await plain.screenshot({ path: `${shots}/8-embed.png` });
+await plain.close();
+
 // 12. The agent loop: REST server + the real MCP CLI over stdio.
 const API_PORT = 4748;
 const api = `http://127.0.0.1:${API_PORT}/v1`;
@@ -362,6 +398,22 @@ try {
   const detail = await (await fetch(`${api}/threads/${threadId}`)).json();
   assert.equal(detail.thread.status, "resolved");
   assert.equal(detail.thread.resolution.reviewedBy.name, "Playground user");
+
+  // 13. The script tag pointed at the server: agents see what visitors leave.
+  plain = await embedPage({ server: api, "user-name": "Visitor B" });
+  assert.equal(await plain.evaluate(() => window.AnnotateKit.instance.backend), "server");
+  await annotateBuy(plain, "Price is hard to read");
+  await plain.waitForFunction(
+    async () =>
+      (await window.AnnotateKit.instance.service.listThreads(null, { projectId: "plain-site" }))
+        .items.length === 1,
+  );
+  const listedPlain = await (await fetch(`${api}/threads?projectId=plain-site`)).json();
+  assert.equal(listedPlain.items.length, 1);
+  assert.equal(listedPlain.items[0].title, "Price is hard to read");
+  assert.equal(listedPlain.items[0].createdBy.name, "Visitor B");
+  assert.equal(await embedPins(plain), 1);
+  await plain.close();
 } finally {
   apiServer.kill();
 }
