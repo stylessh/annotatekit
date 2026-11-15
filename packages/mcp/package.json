@@ -1,0 +1,46 @@
+{
+  "name": "@annotatekit/mcp",
+  "version": "0.0.0",
+  "license": "MIT",
+  "description": "MCP server that lets coding agents read, reply to and resolve AnnotateKit feedback.",
+  "type": "module",
+  "sideEffects": false,
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "bin": {
+    "annotatekit-mcp": "./dist/cli.js"
+  },
+  "exports": {
+    ".": {
+      "@annotatekit/source": "./src/index.ts",
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "dist"
+  ],
+  "engines": {
+    "node": ">=22.13"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "dependencies": {
+    "@annotatekit/client": "workspace:*",
+    "@annotatekit/core": "workspace:*",
+    "@annotatekit/sqlite": "workspace:*",
+    "@modelcontextprotocol/sdk": "1.32.2",
+    "zod": "^4.6.7"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/stylessh/annotatekit.git",
+    "directory": "packages/mcp"
+  },
+  "devDependencies": {
+    "@annotatekit/server": "workspace:*"
+  }
+}
