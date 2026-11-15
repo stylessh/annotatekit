@@ -151,6 +151,33 @@ describe("server options", () => {
     expect((await app.fetch(new Request("http://x/v1/threads"))).status).toBe(200);
   });
 
+  it("enforces read-only and sign-in whitelist decisions", async () => {
+    const app = createAnnotateKitServer({
+      storage: createSqliteStorage(),
+      auth: createStaticServerAuth(null),
+      whitelist: {
+        check: ({ url, actor }) =>
+          url.includes("prod")
+            ? { allowed: true, readOnly: true }
+            : actor
+              ? { allowed: true }
+              : { allowed: false, signIn: true, reason: "Sign-in required" },
+      },
+    });
+    const prod = { origin: "https://prod.example" };
+    expect((await app.fetch(new Request("http://x/v1/threads", { headers: prod }))).status).toBe(
+      200,
+    );
+    const write = await app.fetch(
+      new Request("http://x/v1/threads", { method: "POST", headers: prod, body: "{}" }),
+    );
+    expect(write.status).toBe(403);
+    const staging = { origin: "https://staging.example" };
+    expect((await app.fetch(new Request("http://x/v1/threads", { headers: staging }))).status).toBe(
+      401,
+    );
+  });
+
   it("mounts extra handlers and honours basePath", async () => {
     const app = createAnnotateKitServer({
       storage: createSqliteStorage(),

@@ -286,7 +286,13 @@ export function createAnnotateKitServer(options: AnnotateKitServerOptions): Anno
     if (options.environment !== undefined) context.environment = options.environment;
     const decision = await options.whitelist.check(context);
     if (!decision.allowed) {
+      if (!actor && decision.signIn) {
+        throw new AnnotateKitError("unauthorized", decision.reason ?? "Sign-in required");
+      }
       throw new AnnotateKitError("not_allowed", decision.reason ?? "Origin is not whitelisted");
+    }
+    if (decision.readOnly && request.method !== "GET" && request.method !== "HEAD") {
+      throw new AnnotateKitError("not_allowed", decision.reason ?? "AnnotateKit is read-only here");
     }
   }
 
