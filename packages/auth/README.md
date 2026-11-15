@@ -124,4 +124,34 @@ createAnnotateKitServer({
 
 The widget opens `<baseUrl>/<id>/login?origin=<page origin>` in a popup. The backend runs Authorization Code with PKCE, verifies the ID token (signature via JWKS, issuer, audience, nonce, expiry), and posts `{ type: "annotatekit:session", token, expiresAt }` back to the opener, only at an allowed origin. The IdP's tokens never reach the browser. Sessions last 8 hours; on expiry the widget opens the popup again, which most IdPs complete without a prompt.
 
-Magic links and SAML come later. See the design doc for the roadmap.
+## Magic links
+
+```ts
+const links = magicLinkAuth({
+  mailer: {
+    send: ({ to, url }) =>
+      resend.emails.send({
+        to,
+        subject: "Sign in to AnnotateKit",
+        html: `<a href="${url}">Sign in</a>`,
+      }),
+  },
+  sessionSecret: process.env.SESSION_SECRET,
+  baseUrl: "https://annotatekit.acme.com/auth",
+  allowedOrigins: ["https://*.acme.com"],
+  allowedDomains: ["acme.com", "agency.io"],
+  usedTokens: createSqliteUsedTokenStore(db), // one-time links across restarts
+});
+```
+
+`POST <baseUrl>/magic-link` with `{ email, returnTo }` emails a 15-minute, single-use link (always 202, so addresses aren't revealed). Opening it redirects to `returnTo#annotatekit_session=<token>`. Use `consoleMailer()` locally.
+
+## Storing agent keys in SQLite
+
+`createSqliteApiKeyStore(db)` keeps API keys (hashes only) in an `annotatekit_api_keys` table. Pass the same database you use for storage.
+
+## Guests
+
+Shared-password guests are `comment-only` by default: they read, open threads and comment, but can't edit, resolve or delete. Pass `guestPolicy: "own-threads"` to `createServerAuth`, `createRequestGuard` or `createRoleAuthorizer` to let them manage their own threads.
+
+SAML comes later. See the design doc for the roadmap.

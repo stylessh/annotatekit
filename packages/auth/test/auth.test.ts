@@ -347,3 +347,24 @@ describe("request guard", () => {
     ).toMatchObject({ ok: false, code: "forbidden" });
   });
 });
+
+describe("guest policy", () => {
+  const guest: HumanActor = {
+    kind: "human",
+    id: "guest_1",
+    name: "Guest",
+    provider: "shared-password",
+    groups: ["guest"],
+  };
+  const own = { createdBy: guest } as Thread;
+  const roles = mapGroups({ default: "commenter" });
+
+  it("lets guests comment but not resolve, even their own threads, by default", async () => {
+    const authorize = createRoleAuthorizer(roles);
+    expect(await authorize({ actor: guest, action: "comment:create" })).toBe(true);
+    expect(await authorize({ actor: guest, action: "thread:create" })).toBe(true);
+    expect(await authorize({ actor: guest, action: "thread:resolve", thread: own })).toBe(false);
+    const relaxed = createRoleAuthorizer(roles, undefined, "own-threads");
+    expect(await relaxed({ actor: guest, action: "thread:resolve", thread: own })).toBe(true);
+  });
+});

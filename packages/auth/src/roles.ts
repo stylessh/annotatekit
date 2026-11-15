@@ -1,6 +1,8 @@
 import {
   type Actor,
+  type AuthAction,
   type AuthAdapter,
+  type AuthorizationRequest,
   type AuthScope,
   ROLES,
   type Role,
@@ -66,6 +68,35 @@ function compile(pattern: string): (actor: Actor & { kind: "human" }) => boolean
   return (actor) => actor.id === pattern || (actor.groups ?? []).includes(pattern);
 }
 
+/**
+ * What people signed in with a shared password may do. `comment-only` (the
+ * default) lets them read, open threads and comment, but not edit, resolve or
+ * delete threads, even their own. `own-threads` gives them the full
+ * `commenter` role.
+ */
+export type GuestPolicy = "comment-only" | "own-threads";
+
+const GUEST_PROVIDER = "shared-password";
+const GUEST_ALLOWED: readonly AuthAction[] = ["thread:read", "thread:create", "comment:create"];
+
+/** `scopesAllow`, plus the guest policy for shared-password actors. */
+export function permits(
+  scopes: AuthScope[],
+  request: AuthorizationRequest,
+  guestPolicy: GuestPolicy = "comment-only",
+): boolean {
+  const { actor } = request;
+  if (
+    guestPolicy === "comment-only" &&
+    actor?.kind === "human" &&
+    actor.provider === GUEST_PROVIDER &&
+    !GUEST_ALLOWED.includes(request.action)
+  ) {
+    return false;
+  }
+  return scopesAllow(scopes, request);
+}
+
 /** The scopes an actor holds through its roles. */
 export async function scopesFor(roles: RoleMapper, actor: Actor): Promise<AuthScope[]> {
   return scopesForRoles(await roles(actor));
@@ -79,6 +110,7 @@ export async function scopesFor(roles: RoleMapper, actor: Actor): Promise<AuthSc
 export function createRoleAuthorizer(
   roles: RoleMapper,
   agentScopes?: (actor: Actor) => AuthScope[] | undefined,
+  guestPolicy?: GuestPolicy,
 ): NonNullable<AuthAdapter["authorize"]> {
   return async (request) => {
     if (!request.actor) return false;
@@ -86,6 +118,6 @@ export function createRoleAuthorizer(
       request.actor.kind === "agent"
         ? (agentScopes?.(request.actor) ?? [])
         : await scopesFor(roles, request.actor);
-    return scopesAllow(scopes, request);
+    return permits(scopes, request, guestPolicy);
   };
 }

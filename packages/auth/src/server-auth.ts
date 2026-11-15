@@ -2,10 +2,9 @@ import {
   type Actor,
   type AuthorizationRequest,
   type AuthScope,
-  scopesAllow,
   scopesForRoles,
 } from "@annotatekit/core";
-import type { RoleMapper } from "./roles.js";
+import { type GuestPolicy, permits, type RoleMapper } from "./roles.js";
 import type { Verifier } from "./verifier.js";
 
 export interface ServerAuthOptions {
@@ -18,6 +17,8 @@ export interface ServerAuthOptions {
    * `readOnly(anonymous())` so only allowed pages are readable. Defaults to `false`.
    */
   anonymousRead?: boolean;
+  /** What shared-password guests may do. Defaults to `comment-only`. */
+  guestPolicy?: GuestPolicy;
 }
 
 /** Shape of `@annotatekit/server`'s `ServerAuth`, without depending on it. */
@@ -47,7 +48,7 @@ export function createServerAuth(options: ServerAuthOptions): VerifiedServerAuth
       const scopes =
         credentialScopes.get(actor) ??
         (actor.kind === "human" ? scopesForRoles(await options.roles(actor)) : []);
-      return scopesAllow(scopes, request);
+      return permits(scopes, request, options.guestPolicy);
     },
   };
 }

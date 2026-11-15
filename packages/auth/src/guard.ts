@@ -5,12 +5,11 @@ import {
   type AuthScope,
   type Comment,
   type Group,
-  scopesAllow,
   scopesForRoles,
   type Thread,
   type WhitelistAdapter,
 } from "@annotatekit/core";
-import type { RoleMapper } from "./roles.js";
+import { type GuestPolicy, permits, type RoleMapper } from "./roles.js";
 import type { Verifier } from "./verifier.js";
 
 export interface RequestGuardOptions {
@@ -20,6 +19,8 @@ export interface RequestGuardOptions {
   whitelist: WhitelistAdapter;
   /** Roles for human actors. Agents use the scopes on their credential. */
   roles: RoleMapper;
+  /** What shared-password guests may do. Defaults to `comment-only`. */
+  guestPolicy?: GuestPolicy;
 }
 
 export interface GuardCheck {
@@ -115,7 +116,7 @@ export function createRequestGuard(options: RequestGuardOptions): RequestGuard {
       if (check.thread) request_.thread = check.thread;
       if (check.comment) request_.comment = check.comment;
       if (check.group) request_.group = check.group;
-      if (!scopesAllow(scopes, request_)) {
+      if (!permits(scopes, request_, options.guestPolicy)) {
         return fail(403, "forbidden", `Not allowed to ${check.action}`);
       }
       return { ok: true, actor, scopes, readOnly };
