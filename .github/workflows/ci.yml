@@ -20,3 +20,27 @@ jobs:
       - run: pnpm typecheck
       - run: pnpm test
       - run: pnpm build
+
+  e2e:
+    # Drives the playground in headless Chromium against the real REST server
+    # and the annotatekit-mcp CLI. See apps/playground/e2e.mjs.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm build
+      - run: pnpm --filter @annotatekit/playground exec playwright install --with-deps chromium
+      - run: mkdir -p e2e-shots && pnpm --filter @annotatekit/playground test:e2e
+        env:
+          SHOTS_DIR: ${{ github.workspace }}/e2e-shots
+      - if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e-screenshots
+          path: e2e-shots
+          if-no-files-found: ignore
