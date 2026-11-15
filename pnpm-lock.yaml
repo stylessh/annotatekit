@@ -29,6 +29,12 @@ importers:
 
   packages/core: {}
 
+  packages/sqlite:
+    dependencies:
+      '@annotatekit/core':
+        specifier: workspace:*
+        version: link:../core
+
 packages:
 
   '@biomejs/biome@2.6.8':

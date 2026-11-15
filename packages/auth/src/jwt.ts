@@ -1,12 +1,10 @@
 import { base64UrlDecode, base64UrlEncode, fromUtf8, randomBase62, utf8 } from "./encoding.js";
 
 /** The registered and AnnotateKit claims this package reads and writes. */
-export interface TokenClaims {
+export interface TokenInput {
   iss: string;
   aud: string;
   sub: string;
-  exp: number;
-  iat: number;
   jti?: string;
   name?: string;
   email?: string;
@@ -16,6 +14,12 @@ export interface TokenClaims {
   /** How the subject signed in, such as `host` or `shared-password`. */
   provider?: string;
   [claim: string]: unknown;
+}
+
+/** A verified token's claims, with its issue and expiry times. */
+export interface TokenClaims extends TokenInput {
+  exp: number;
+  iat: number;
 }
 
 export interface SignOptions {
@@ -42,10 +46,7 @@ const HEADER = base64UrlEncode(utf8(JSON.stringify({ alg: "HS256", typ: "JWT" })
 const MIN_SECRET_BYTES = 32;
 
 /** Signs an HS256 JWT. `iat`, `exp` and a random `jti` are filled in. */
-export async function signToken(
-  claims: Omit<TokenClaims, "iat" | "exp">,
-  options: SignOptions,
-): Promise<string> {
+export async function signToken(claims: TokenInput, options: SignOptions): Promise<string> {
   const iat = Math.floor((options.now ?? Date.now)() / 1000);
   const payload: TokenClaims = {
     jti: randomBase62(16),

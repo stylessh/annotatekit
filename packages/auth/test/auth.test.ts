@@ -94,7 +94,7 @@ describe("host mode", () => {
 
   it("reuses the app's own session lookup", async () => {
     const verifier = hostSessionVerifier({
-      verify: (r) =>
+      verify: (r: Request) =>
         r.headers.get("cookie") === "sid=1" ? { ...alan, provider: undefined } : null,
     } as never);
     expect((await verifier.verify(req({ cookie: "sid=1" })))?.actor).toMatchObject({

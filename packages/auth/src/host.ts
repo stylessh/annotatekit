@@ -1,5 +1,5 @@
 import type { HumanActor } from "@annotatekit/core";
-import { bearerToken, signToken, type TokenClaims, verifyToken } from "./jwt.js";
+import { bearerToken, signToken, type TokenClaims, type TokenInput, verifyToken } from "./jwt.js";
 import type { Verifier } from "./verifier.js";
 
 export const DEFAULT_AUDIENCE = "annotatekit";
@@ -24,7 +24,7 @@ export function mintHostToken(
   user: Pick<HumanActor, "id" | "name"> & Partial<HumanActor>,
   options: MintHostTokenOptions,
 ): Promise<string> {
-  const claims: Omit<TokenClaims, "iat" | "exp"> = {
+  const claims: TokenInput = {
     iss: options.issuer,
     aud: options.audience ?? DEFAULT_AUDIENCE,
     sub: user.id,
