@@ -8,6 +8,7 @@ This is a pnpm workspace. Packages live in `packages/`, demo apps in `apps/`.
 | ---------------------------------------------- | ------------------------------------------------------------------------------------------------------------- |
 | [`@annotatekit/core`](packages/core)           | Framework-agnostic models, element anchors, adapter interfaces and built-in storage. No DOM framework.        |
 | [`@annotatekit/auth`](packages/auth)           | Whitelist rules, role mapping, host tokens, shared passwords, agent API keys and a server-side request guard. |
+| [`@annotatekit/auth-saml`](packages/auth-saml) | SAML 2.0 sign-in for standalone mode, on `@node-saml/node-saml`.                                              |
 | [`@annotatekit/inspector`](packages/inspector) | Shadow DOM overlay: pick, pin, box and group elements; captures breakpoint and CSS system context.            |
 | [`@annotatekit/react`](packages/react)         | `<AnnotateKitInspector>` and `useInspector` for React 18+.                                                    |
 | [`@annotatekit/vue`](packages/vue)             | `<AnnotateKitInspector>` and `useInspector` for Vue 3.                                                        |

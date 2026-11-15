@@ -154,4 +154,4 @@ const links = magicLinkAuth({
 
 Shared-password guests are `comment-only` by default: they read, open threads and comment, but can't edit, resolve or delete. Pass `guestPolicy: "own-threads"` to `createServerAuth`, `createRequestGuard` or `createRoleAuthorizer` to let them manage their own threads.
 
-SAML comes later. See the design doc for the roadmap.
+For SAML 2.0 IdPs (ADFS, Okta or Entra SAML apps, Shibboleth), add `saml()` from [`@annotatekit/auth-saml`](../auth-saml) to `providers`.
