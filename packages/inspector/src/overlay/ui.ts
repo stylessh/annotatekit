@@ -41,6 +41,12 @@ const ICONS = {
   chat: "M4 5h16v11H9l-5 4z",
   alert: "M12 8v5M12 16.5v.5M12 3l10 18H2z",
   list: "M8 6h12M8 12h12M8 18h12M4 6h.01M4 12h.01M4 18h.01",
+  annotate: "M4 5h16v11H9l-5 4zM12 8v5M9.5 10.5h5",
+  check: "M5 12.5l4.5 4.5L19 7.5",
+  cursor: "M6 4l13 6.5-5.6 1.9L11.5 18z",
+  area: "M4 9V4h5M15 4h5v5M20 15v5h-5M9 20H4v-5",
+  text: "M5 7V5h14v2M12 5v14M9 19h6",
+  key: "M14.5 4a5.5 5.5 0 11-4.9 8L4 17.6V20h2.4v-2h2v-2h2l1.2-1.2A5.5 5.5 0 1114.5 4zM16 8h.01",
 } as const;
 export type IconName = keyof typeof ICONS;
 
@@ -562,54 +568,46 @@ export interface ToolbarState {
 /** The floating toolbar's elements. Update them with {@link renderToolbarState}. */
 export function toolbarParts(h: H, opts: { keys?: boolean } = {}): ToolbarParts {
   const el = h("div", { class: "toolbar", role: "toolbar", "aria-label": "AnnotateKit" });
-  const toggle = h(
-    "button",
-    { type: "button", class: "btn", "data-action": "toggle", "aria-pressed": "false" },
-    "Annotate",
-  );
-  const mode = (name: string, title: string) =>
-    h(
-      "button",
-      { type: "button", class: "btn", "data-action": `mode-${name.toLowerCase()}`, title },
-      name,
-    );
-  const element = mode("Element", "Click to pin");
-  const area = mode("Area", "Drag to box an area");
-  const text = mode("Text", "Select text to quote it");
+  const doc = el.ownerDocument;
+  const tool = (action: string, label: string, name: IconName, pressable = true) => {
+    const b = h("button", {
+      type: "button",
+      class: "btn icon",
+      "data-action": action,
+      "aria-label": label,
+      title: label,
+    });
+    if (pressable) b.setAttribute("aria-pressed", "false");
+    b.append(icon(doc, name));
+    return b;
+  };
+  const toggle = tool("toggle", "Annotate", "annotate");
+  const element = tool("mode-element", "Element: click to pin", "cursor");
+  const area = tool("mode-area", "Area: drag to box", "area");
+  const text = tool("mode-text", "Text: select to quote", "text");
   const modes = h("div", { class: "modes", role: "group", "aria-label": "Mode" });
   modes.append(element, area, text);
   const bp = h("span", { class: "bp", "aria-live": "polite" });
-  const threads = h("button", {
-    type: "button",
-    class: "btn",
-    "data-action": "threads",
-    "aria-pressed": "false",
-    title: "Threads on this page",
-  });
-  const badge = h("span", { class: "badge" });
-  threads.append(icon(el.ownerDocument, "list"), h("span", {}, "Threads"), badge);
-  el.append(toggle, modes, bp, threads);
+  const threads = tool("threads", "Threads on this page", "list");
+  const badge = h("span", { class: "badge", "aria-hidden": "true" });
+  threads.append(badge);
+  el.append(toggle, modes, threads);
   let keys: HTMLButtonElement | null = null;
   if (opts.keys) {
-    keys = h(
-      "button",
-      {
-        type: "button",
-        class: "btn",
-        "data-action": "keys",
-        "aria-pressed": "false",
-        title: "Agent API keys",
-      },
-      "Keys",
-    );
+    keys = tool("keys", "Agent API keys", "key");
     el.append(keys);
   }
+  el.append(bp);
   return { el, toggle, modes, element, area, text, bp, threads, badge, keys };
 }
 
 export function renderToolbarState(parts: ToolbarParts, state: ToolbarState): void {
-  parts.toggle.setAttribute("aria-pressed", String(state.active));
-  parts.toggle.textContent = state.active ? "Done" : "Annotate";
+  const { toggle } = parts;
+  toggle.setAttribute("aria-pressed", String(state.active));
+  const label = state.active ? "Done annotating" : "Annotate";
+  toggle.setAttribute("aria-label", label);
+  toggle.title = label;
+  toggle.replaceChildren(icon(toggle.ownerDocument, state.active ? "check" : "annotate"));
   parts.modes.hidden = !state.active;
   parts.element.setAttribute("aria-pressed", String(state.mode === "element"));
   parts.area.setAttribute("aria-pressed", String(state.mode === "area"));
@@ -617,8 +615,13 @@ export function renderToolbarState(parts: ToolbarParts, state: ToolbarState): vo
   parts.bp.textContent = state.breakpoint;
   parts.threads.hidden = !state.threads;
   parts.threads.setAttribute("aria-pressed", String(!!state.threadsOpen));
-  parts.badge.hidden = !state.unresolved;
-  parts.badge.textContent = String(state.unresolved ?? 0);
+  const n = state.unresolved ?? 0;
+  parts.badge.hidden = !n;
+  parts.badge.textContent = n > 9 ? "9+" : String(n);
+  parts.threads.setAttribute(
+    "aria-label",
+    n ? `Threads on this page, ${n} unresolved` : "Threads on this page",
+  );
   parts.keys?.setAttribute("aria-pressed", String(!!state.keysOpen));
 }
 

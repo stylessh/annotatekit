@@ -1,10 +1,10 @@
 :root {
   --g-bg: #ffffff;
-  --g-fg: #14142b;
-  --g-muted: rgba(20, 20, 43, 0.55);
+  --g-fg: #18181b;
+  --g-muted: rgba(24, 24, 27, 0.55);
   --g-stage: #f4f4f6;
-  --g-fill: rgba(20, 20, 60, 0.06);
-  --g-accent: #2d2dd8;
+  --g-fill: rgba(24, 24, 27, 0.06);
+  --g-accent: #18181b;
   color-scheme: light;
 }
 body[data-theme="dark"] {
@@ -13,6 +13,7 @@ body[data-theme="dark"] {
   --g-muted: rgba(242, 242, 247, 0.55);
   --g-stage: #000000;
   --g-fill: rgba(255, 255, 255, 0.07);
+  --g-accent: #3f3f46;
   color-scheme: dark;
 }
 * {
@@ -92,7 +93,7 @@ body {
   background: var(--c);
 }
 .g-swatches button[aria-pressed="true"] {
-  outline: 2px solid var(--c);
+  outline: 2px solid var(--g-fg);
   outline-offset: 3px;
 }
 .g-nav {

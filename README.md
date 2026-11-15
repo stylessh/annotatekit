@@ -239,7 +239,7 @@ pnpm check:packages  # after build: publint + Are The Types Wrong on packed tarb
 
 `pnpm ui` opens `apps/playground/ui.html`: the toolbar, pins, composers,
 messages, attachments, thread panel, thread list and agent keys panel in every
-state, rendered with mock data in light, dark and vivid themes and any accent.
+state, rendered with mock data in light, dark and vivid themes, neutral or any accent.
 At the bottom, the real overlay runs on an in-memory backend.
 
 The overlay is themed with CSS variables (`--ak-accent`, `--ak-surface`,
