@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import type { IncomingMessage, ServerResponse } from "node:http";
 import { fileURLToPath } from "node:url";
-import { defineConfig, type Plugin } from "vite";
+import { defaultClientConditions, defineConfig, type Plugin } from "vite";
 
 const BUNDLE = fileURLToPath(new URL("../../packages/embed/dist/annotatekit.js", import.meta.url));
 const ATTRS = ["project", "server", "user-name", "theme", "accent"];
@@ -46,4 +46,17 @@ function embedDemo(): Plugin {
 }
 
 // Top-level await picks the backend before the overlay mounts.
-export default defineConfig({ build: { target: "es2022" }, plugins: [embedDemo()] });
+export default defineConfig({
+  // Use workspace packages' sources, so `pnpm ui` needs no build first.
+  resolve: { conditions: ["@annotatekit/source", ...defaultClientConditions] },
+  build: {
+    target: "es2022",
+    rollupOptions: {
+      input: {
+        main: fileURLToPath(new URL("./index.html", import.meta.url)),
+        ui: fileURLToPath(new URL("./ui.html", import.meta.url)),
+      },
+    },
+  },
+  plugins: [embedDemo()],
+});

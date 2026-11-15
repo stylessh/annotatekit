@@ -12,8 +12,25 @@ import { resolveAnchor } from "../capture/selector.js";
 import { type CaptureOptions, Capturer } from "../capture/snapshot.js";
 import { quoteFromRange, rangeFromQuote } from "../capture/text-range.js";
 import type { AnnotationDraft, ElementSnapshot, RenderableAnnotation } from "../types.js";
+import { loadOverlayFont } from "./font.js";
 import { createKeysPanel, type KeysPanel } from "./keys-panel.js";
 import { OVERLAY_CSS } from "./styles.js";
+import {
+  autosize,
+  bindFileField,
+  createThreadsPanel,
+  isolateTyping,
+  type ThreadSource,
+  type ThreadsPanel,
+} from "./threads.js";
+import {
+  applyPin,
+  chip,
+  composerParts,
+  elementFactory,
+  renderToolbarState,
+  toolbarParts,
+} from "./ui.js";
 
 /** `element`: click to pin, drag to box. `area`: drag only. `text`: select text to quote it. */
 export type InspectMode = "element" | "area" | "text";
@@ -31,8 +48,19 @@ export interface InspectorOptions extends CaptureOptions {
   toolbar?: boolean;
   /** Toggle shortcut as `Mod+…+KeyboardEvent.code`. Default `"Alt+KeyA"`. `false` disables it. */
   shortcut?: string | false;
-  theme?: "light" | "dark" | "auto";
+  /** `vivid` puts the whole UI on the accent color. Default `auto`. */
+  theme?: "light" | "dark" | "vivid" | "auto";
   accentColor?: string;
+  /**
+   * Load the bundled Instrument Sans for the overlay. Default true. It is
+   * registered under its own family name, so the host page is unaffected.
+   */
+  font?: boolean;
+  /**
+   * Where the thread panel reads threads and sends replies. Clicking a pin then
+   * opens its thread. `bindService` sets this for you.
+   */
+  threads?: ThreadSource;
   annotations?: RenderableAnnotation[];
   /** Keep a provisional pin for each saved draft until the next `setAnnotations()`. Default true. */
   showDraftPins?: boolean;
@@ -65,6 +93,13 @@ export interface Inspector {
   setAnnotations(list: RenderableAnnotation[]): void;
   /** Outline an annotation's targets, e.g. while its thread is open in your UI. */
   focusAnnotation(id: string | null): void;
+  /** Show a thread in the panel, or close the panel with null. Needs a thread source. */
+  openThread(id: string | null): void;
+  /** Show the list of threads on this page. Needs a thread source. */
+  openThreadList(): void;
+  setThreadSource(source: ThreadSource | null): void;
+  /** Reload the open thread panel, e.g. after a comment arrived. */
+  refreshThreads(): void;
   /** Capture an element without any UI, e.g. for agents or tests. */
   capture(el: Element): ElementSnapshot;
   on<K extends keyof InspectorEvents>(event: K, fn: Listener<InspectorEvents[K]>): () => void;
@@ -94,19 +129,6 @@ interface Pending {
   draft: Omit<AnnotationDraft, "comment" | "context" | "page">;
   anchorSnap: ElementSnapshot;
 }
-
-const elementFactory =
-  (doc: Document) =>
-  <K extends keyof HTMLElementTagNameMap>(
-    tag: K,
-    attrs: Record<string, string> = {},
-    text?: string,
-  ): HTMLElementTagNameMap[K] => {
-    const el = doc.createElement(tag);
-    for (const [k, v] of Object.entries(attrs)) el.setAttribute(k, v);
-    if (text != null) el.textContent = text;
-    return el;
-  };
 
 function place(el: HTMLElement, r: Box) {
   el.style.left = `${r.left}px`;
@@ -170,6 +192,7 @@ export function createInspector(options: InspectorOptions = {}): Inspector {
   host.setAttribute(HOST_ATTR, "");
   if (options.theme && options.theme !== "auto") host.setAttribute("data-theme", options.theme);
   if (options.accentColor) host.style.setProperty("--ak-accent", options.accentColor);
+  if (options.font !== false) loadOverlayFont(doc);
   const shadow = host.attachShadow({ mode: "open" });
   const style = doc.createElement("style");
   style.textContent = OVERLAY_CSS;
@@ -181,62 +204,22 @@ export function createInspector(options: InspectorOptions = {}): Inspector {
   const label = h("div", { class: "label", hidden: "" });
   const drag = h("div", { class: "drag", hidden: "" });
   const pinLayer = h("div");
-  const composer = h("form", {
-    class: "composer",
-    hidden: "",
-    role: "dialog",
-    "aria-label": "Add annotation",
-  });
+  const composerParts_ = composerParts(h, "new");
+  const composer = composerParts_.form;
+  composer.classList.add("composer");
+  composer.hidden = true;
+  composer.setAttribute("role", "dialog");
+  composer.setAttribute("aria-label", "Add annotation");
   const composerMeta = h("div", { class: "meta" });
-  const textarea = h("textarea", { placeholder: "Leave a note…", "aria-label": "Annotation" });
-  const row = h("div", { class: "row" });
-  row.append(
-    h("span", { class: "hint" }, "↵ save · ⇧↵ newline"),
-    h("button", { type: "button", class: "btn", "data-action": "cancel" }, "Cancel"),
-    h("button", { type: "submit", class: "btn primary" }, "Save"),
-  );
-  composer.append(composerMeta, textarea, row);
+  composer.prepend(composerMeta);
+  const { textarea } = composerParts_;
+  const composerFiles = bindFileField(h, composerParts_, () => schedule());
+  const fitComposer = autosize(textarea);
 
-  const toolbar = h("div", { class: "toolbar", role: "toolbar", "aria-label": "AnnotateKit" });
-  const toggleBtn = h(
-    "button",
-    { type: "button", class: "btn", "data-action": "toggle", "aria-pressed": "false" },
-    "Annotate",
-  );
-  const elementBtn = h(
-    "button",
-    { type: "button", class: "btn", "data-action": "mode-element", title: "Click to pin" },
-    "Element",
-  );
-  const areaBtn = h(
-    "button",
-    { type: "button", class: "btn", "data-action": "mode-area", title: "Drag to box an area" },
-    "Area",
-  );
-  const textBtn = h(
-    "button",
-    { type: "button", class: "btn", "data-action": "mode-text", title: "Select text to quote it" },
-    "Text",
-  );
-  const bpLabel = h("span", { class: "bp", "aria-live": "polite" });
-  toolbar.append(toggleBtn, elementBtn, areaBtn, textBtn, bpLabel);
   let keysPanel: KeysPanel | null = null;
-  let keysBtn: HTMLButtonElement | null = null;
-  if (options.apiKeys) {
-    keysPanel = createKeysPanel(h, options.apiKeys);
-    keysBtn = h(
-      "button",
-      {
-        type: "button",
-        class: "btn",
-        "data-action": "keys",
-        "aria-pressed": "false",
-        title: "Agent API keys",
-      },
-      "Keys",
-    );
-    toolbar.append(keysBtn);
-  }
+  if (options.apiKeys) keysPanel = createKeysPanel(h, options.apiKeys);
+  const bar = toolbarParts(h, { keys: !!keysPanel });
+  const toolbar = bar.el;
   if (options.toolbar === false) toolbar.hidden = true;
 
   shadow.append(
@@ -252,6 +235,19 @@ export function createInspector(options: InspectorOptions = {}): Inspector {
     toolbar,
   );
   if (keysPanel) shadow.append(keysPanel.el);
+  const threadsPanel: ThreadsPanel = createThreadsPanel(h, {
+    labelFor: (id) => {
+      const i = annotations.findIndex((a) => a.id === id);
+      const a = annotations[i];
+      return a?.label ?? (i >= 0 ? String(i + 1) : "·");
+    },
+    onThreadChange: (id) => {
+      focusedId = id;
+      schedule();
+    },
+  });
+  shadow.append(threadsPanel.el);
+  let threadSource: ThreadSource | null = null;
   (options.container ?? doc.body).append(host);
   const pageStyle = doc.createElement("style");
   pageStyle.setAttribute("data-annotatekit-style", "");
@@ -420,21 +416,15 @@ export function createInspector(options: InspectorOptions = {}): Inspector {
         pinLayer.append(pin);
         pinEls.set(a.id, pin);
       }
-      const text = a.label ?? String(i + 1);
-      pin.textContent = text;
-      const count = a.targets?.length ?? 0;
-      if (count > 1) pin.append(h("span", { class: "count" }, String(count)));
-      pin.dataset.status = a.status ?? "open";
-      pin.dataset.kind = a.kind;
-      pin.toggleAttribute("data-draft", a.id.startsWith("draft_"));
-      if (a.color) pin.style.setProperty("--ak-pin", a.color);
-      else pin.style.removeProperty("--ak-pin");
-      pin.setAttribute("aria-pressed", String(focusedId === a.id));
-      const status = a.status ? ` (${a.status.replace("_", " ")})` : "";
-      pin.setAttribute(
-        "aria-label",
-        `Annotation ${text}${count > 1 ? `, ${count} elements` : ""}${status}`,
-      );
+      applyPin(h, pin, {
+        label: a.label ?? String(i + 1),
+        ...(a.status ? { status: a.status } : {}),
+        kind: a.kind,
+        count: a.targets?.length ?? 0,
+        ...(a.color ? { color: a.color } : {}),
+        draft: a.id.startsWith("draft_"),
+        focused: focusedId === a.id,
+      });
       const pos = pinPosition(a);
       pin.hidden = !pos;
       if (pos) {
@@ -492,17 +482,18 @@ export function createInspector(options: InspectorOptions = {}): Inspector {
   }
 
   function renderToolbar() {
-    toggleBtn.setAttribute("aria-pressed", String(active));
-    toggleBtn.textContent = active ? "Done" : "Annotate";
-    elementBtn.hidden = !active;
-    areaBtn.hidden = !active;
-    textBtn.hidden = !active;
-    elementBtn.setAttribute("aria-pressed", String(mode === "element"));
-    areaBtn.setAttribute("aria-pressed", String(mode === "area"));
-    textBtn.setAttribute("aria-pressed", String(mode === "text"));
     if (active) setInspecting(mode === "text" ? "text" : "");
     const { breakpoint, viewport } = capturer.breakpoint();
-    bpLabel.textContent = `${breakpoint.name} · ${viewport.width}px`;
+    renderToolbarState(bar, {
+      active,
+      mode,
+      breakpoint: `${breakpoint.name} · ${viewport.width}px`,
+      threads: !!threadSource,
+      threadsOpen: threadsPanel.open && !threadsPanel.threadId,
+      unresolved: annotations.filter((a) => a.status !== "resolved" && a.status !== "dismissed")
+        .length,
+      keysOpen: keysPanel?.open ?? false,
+    });
   }
 
   function frame() {
@@ -553,9 +544,12 @@ export function createInspector(options: InspectorOptions = {}): Inspector {
 
   function openComposer(next: Pending) {
     pending = next;
-    composerMeta.textContent = composerTitle(next.draft);
+    composerMeta.replaceChildren(chip(h, composerTitle(next.draft), { mono: !next.draft.quote }));
     textarea.value = "";
+    composerParts_.error.textContent = "";
+    composerFiles.clear();
     composer.hidden = false;
+    fitComposer();
     positionComposer();
     schedule();
     textarea.focus({ preventScroll: true });
@@ -565,13 +559,15 @@ export function createInspector(options: InspectorOptions = {}): Inspector {
     if (pending?.draft.quote) doc.getSelection()?.removeAllRanges();
     pending = null;
     composer.hidden = true;
+    composerFiles.clear();
     schedule();
   }
 
   function submitComposer() {
     if (!pending) return;
     const comment = textarea.value.trim();
-    if (!comment) {
+    const files = composerFiles.files();
+    if (!comment && !files.length) {
       textarea.focus();
       return;
     }
@@ -582,6 +578,7 @@ export function createInspector(options: InspectorOptions = {}): Inspector {
       context: capturer.context(anchorSnap, d.targets),
       page: capturer.page(),
     };
+    if (files.length) draft.files = files;
     if (options.showDraftPins !== false)
       drafts.push(draftToRenderable(`draft_${++draftCounter}`, draft));
     selection = [];
@@ -607,9 +604,7 @@ export function createInspector(options: InspectorOptions = {}): Inspector {
     }
   });
   // Keep the page's own shortcuts from firing while typing in the overlay.
-  for (const t of ["keyup", "keypress", "input"] as const) {
-    textarea.addEventListener(t, (e) => e.stopPropagation());
-  }
+  isolateTyping(composer);
 
   // ---- Draft builders ----------------------------------------------------
   function pinDraft(el: Element, clientX: number, clientY: number) {
@@ -817,6 +812,11 @@ export function createInspector(options: InspectorOptions = {}): Inspector {
       api.toggle();
       return;
     }
+    if (e.key === "Escape" && threadsPanel.open && !pending) {
+      threadsPanel.hide();
+      renderToolbar();
+      return;
+    }
     if (!active || e.key !== "Escape") return;
     if (pending) closeComposer();
     else if (selection.length) {
@@ -842,18 +842,34 @@ export function createInspector(options: InspectorOptions = {}): Inspector {
     else if (action === "mode-element") api.setMode("element");
     else if (action === "mode-area") api.setMode("area");
     else if (action === "mode-text") api.setMode("text");
-    else if (action === "keys" && keysPanel) {
+    else if (action === "threads") {
+      if (threadsPanel.open && !threadsPanel.threadId) threadsPanel.hide();
+      else {
+        keysPanel?.hide();
+        threadsPanel.showList();
+      }
+      renderToolbar();
+    } else if (action === "keys" && keysPanel) {
+      threadsPanel.hide();
       void keysPanel.toggle();
-      keysBtn?.setAttribute("aria-pressed", String(keysPanel.open));
+      renderToolbar();
     }
   });
-  keysPanel?.el.addEventListener("click", () => {
-    keysBtn?.setAttribute("aria-pressed", String(keysPanel?.open ?? false));
-  });
+  threadsPanel.el.addEventListener("click", () => renderToolbar());
+  keysPanel?.el.addEventListener("click", () => renderToolbar());
   pinLayer.addEventListener("click", (e) => {
     const id = (e.target as Element).closest(".pin")?.getAttribute("data-id");
     if (!id) return;
-    api.focusAnnotation(focusedId === id ? null : id);
+    const closing = focusedId === id;
+    if (threadSource && !id.startsWith("draft_")) {
+      if (closing) threadsPanel.hide();
+      else {
+        keysPanel?.hide();
+        threadsPanel.showThread(id);
+      }
+      renderToolbar();
+    }
+    api.focusAnnotation(closing ? null : id);
     emit("select", id);
   });
 
@@ -994,7 +1010,30 @@ export function createInspector(options: InspectorOptions = {}): Inspector {
       drafts = [];
       resolved.clear();
       quoteRanges.clear();
+      renderToolbar();
       schedule();
+    },
+    openThread(id) {
+      if (id === null) threadsPanel.hide();
+      else if (threadSource) {
+        keysPanel?.hide();
+        threadsPanel.showThread(id);
+      }
+      renderToolbar();
+    },
+    openThreadList() {
+      if (!threadSource) return;
+      keysPanel?.hide();
+      threadsPanel.showList();
+      renderToolbar();
+    },
+    setThreadSource(source) {
+      threadSource = source;
+      threadsPanel.setSource(source);
+      renderToolbar();
+    },
+    refreshThreads() {
+      threadsPanel.refresh();
     },
     focusAnnotation(id) {
       focusedId = id;
@@ -1029,6 +1068,7 @@ export function createInspector(options: InspectorOptions = {}): Inspector {
     },
   };
 
+  if (options.threads) api.setThreadSource(options.threads);
   renderToolbar();
   if (options.active) api.activate();
   else schedule();

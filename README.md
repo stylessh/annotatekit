@@ -230,8 +230,23 @@ pnpm typecheck   # tsc --noEmit across packages
 pnpm lint        # biome
 pnpm build       # emit ESM + .d.ts to packages/*/dist
 pnpm dev         # server + playground, see above
+pnpm ui          # UI playground: every overlay component and state, no build needed
 pnpm changeset   # describe your change for the next release
 pnpm check:packages  # after build: publint + Are The Types Wrong on packed tarballs
 ```
+
+### UI playground
+
+`pnpm ui` opens `apps/playground/ui.html`: the toolbar, pins, composers,
+messages, attachments, thread panel, thread list and agent keys panel in every
+state, rendered with mock data in light, dark and vivid themes and any accent.
+At the bottom, the real overlay runs on an in-memory backend.
+
+The overlay is themed with CSS variables (`--ak-accent`, `--ak-surface`,
+`--ak-fg`, `--ak-radius-*`, `--ak-font`, …; see
+`packages/inspector/src/overlay/styles.ts`). Set them on
+`[data-annotatekit-overlay]` to restyle it. It uses a bundled Instrument Sans
+(SIL OFL 1.1), registered under its own family name so the host page is never
+affected; pass `font: false` to use the system font.
 
 Requires Node 20+ and pnpm 10. Releases are manual; see [RELEASING.md](RELEASING.md).

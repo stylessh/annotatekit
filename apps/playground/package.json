@@ -4,6 +4,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
+    "ui": "vite --open /ui.html",
     "build": "vite build",
     "preview": "vite preview",
     "test:e2e": "vite build && node e2e.mjs",

@@ -2,8 +2,11 @@ import {
   type Actor,
   type AnnotateKitService,
   type Annotation,
+  type AttachmentAdapter,
+  type CommentAttachment,
   type CreateThreadInput,
   createAnnotateKitService,
+  createDataUrlAttachmentAdapter,
   type ElementAnchor,
   type Group,
   type StorageAdapter,
@@ -13,6 +16,7 @@ import {
   type ThreadStatus,
 } from "@annotatekit/core";
 import type { Inspector } from "./overlay/inspector.js";
+import type { ThreadSource } from "./overlay/threads.js";
 import type { AnnotationDraft, RenderableAnnotation } from "./types.js";
 
 /** Inspector-specific data kept in `Annotation.metadata.inspector`. */
@@ -49,7 +53,7 @@ export function draftToThreadInput(
   const input: CreateThreadInput = {
     projectId: opts.projectId,
     page: draft.page,
-    title: titleFrom(draft.comment),
+    title: titleFrom(draft.comment) || (draft.files?.length ? "Attachment" : ""),
     annotation: {
       kind: draft.kind,
       anchor: draft.anchor,
@@ -106,6 +110,13 @@ export interface BindServiceOptions {
   statuses?: ThreadStatus[];
   /** Page key for filtering. Defaults to `location.pathname`. */
   pathname?: () => string;
+  /**
+   * Where files attached to comments are stored. Defaults to inline `data:`
+   * URLs (up to 512 KB each), which needs no server.
+   */
+  attachments?: AttachmentAdapter;
+  /** Open a thread in the overlay's panel when its pin is clicked. Default true. */
+  threadPanel?: boolean;
   onCreated?: (detail: ThreadDetail) => void;
   onError?: (error: unknown) => void;
 }
@@ -147,18 +158,21 @@ export function bindService(inspector: Inspector, opts: BindServiceOptions): Ser
   const fail = (e: unknown) => (opts.onError ? opts.onError(e) : console.error("[annotatekit]", e));
   let disposed = false;
   let queued: Promise<void> | null = null;
+  const attachments = opts.attachments ?? createDataUrlAttachmentAdapter();
+  const upload = (files: File[], threadId?: string): Promise<CommentAttachment[]> =>
+    Promise.all(
+      files.map((f) => attachments.upload(f, threadId ? { projectId, threadId } : { projectId })),
+    );
+  const query = () => ({
+    projectId,
+    pathname: pathname(),
+    status: opts.statuses ?? DEFAULT_STATUSES,
+  });
 
   async function load(): Promise<void> {
     const who = actor();
     const [threads, groups] = await Promise.all([
-      listAll((cursor) =>
-        service.listThreads(who, {
-          projectId,
-          pathname: pathname(),
-          status: opts.statuses ?? DEFAULT_STATUSES,
-          cursor,
-        }),
-      ),
+      listAll((cursor) => service.listThreads(who, { ...query(), cursor })),
       listAll<Group>((cursor) => service.listGroups(who, { projectId, cursor })),
     ]);
     const colors = new Map(groups.map((g) => [g.id, g.color]));
@@ -187,8 +201,11 @@ export function bindService(inspector: Inspector, opts: BindServiceOptions): Ser
   const offCreate = inspector.on("create", (draft) => {
     const groupId = opts.groupId?.();
     const input = draftToThreadInput(draft, { projectId, ...(groupId ? { groupId } : {}) });
-    service
-      .createThread(actor(), input)
+    upload(draft.files ?? [])
+      .then((files) => {
+        if (files.length && input.comment) input.comment.attachments = files;
+        return service.createThread(actor(), input);
+      })
       .then(async (detail) => {
         opts.onCreated?.(detail);
         if (!service.subscribe) await reload();
@@ -197,7 +214,30 @@ export function bindService(inspector: Inspector, opts: BindServiceOptions): Ser
   });
   const offChanges = service.subscribe?.((change) => {
     if (change.collection !== "comments") void reload();
+    inspector.refreshThreads?.();
   });
+
+  const source: ThreadSource = {
+    list: () => listAll((cursor) => service.listThreads(actor(), { ...query(), cursor })),
+    get: (id) => service.getThread(actor(), id),
+    async reply(id, { body, files }) {
+      const input: { body: string; format: "plain"; attachments?: CommentAttachment[] } = {
+        body,
+        format: "plain",
+      };
+      if (files.length) input.attachments = await upload(files, id);
+      await service.addComment(actor(), id, input);
+      if (!service.subscribe) await reload();
+    },
+    async act(id, action) {
+      if (action === "reopen") await service.reopenThread(actor(), id);
+      else
+        await service.resolveThread(actor(), id, action === "approve" ? { note: "Approved" } : {});
+      if (!service.subscribe) await reload();
+    },
+    me: () => actor()?.id,
+  };
+  if (opts.threadPanel !== false) inspector.setThreadSource?.(source);
 
   void reload();
   return {
@@ -206,6 +246,7 @@ export function bindService(inspector: Inspector, opts: BindServiceOptions): Ser
       disposed = true;
       offCreate();
       offChanges?.();
+      if (opts.threadPanel !== false) inspector.setThreadSource?.(null);
     },
   };
 }
