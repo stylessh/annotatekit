@@ -14,10 +14,10 @@ const service = createAnnotateKitService({ storage });
 
 Options:
 
-| Option        | Default    | Notes                                                              |
-| ------------- | ---------- | ------------------------------------------------------------------ |
-| `database`    | `:memory:` | A file path, `:memory:`, or an open database object                |
-| `tablePrefix` | `ak_`      | Prefix for table names, to share a database with your own tables  |
+| Option        | Default    | Notes                                                            |
+| ------------- | ---------- | ---------------------------------------------------------------- |
+| `database`    | `:memory:` | A file path, `:memory:`, or an open database object              |
+| `tablePrefix` | `ak_`      | Prefix for table names, to share a database with your own tables |
 
 Each entity is stored as JSON, with the fields queries filter on (project,
 status, page URL, pathname, group, author, timestamps) copied into indexed
