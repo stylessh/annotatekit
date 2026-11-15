@@ -26,6 +26,9 @@ importers:
 
   apps/playground:
     dependencies:
+      '@annotatekit/client':
+        specifier: workspace:*
+        version: link:../../packages/client
       '@annotatekit/core':
         specifier: workspace:*
         version: link:../../packages/core
@@ -33,6 +36,15 @@ importers:
         specifier: workspace:*
         version: link:../../packages/inspector
     devDependencies:
+      '@annotatekit/mcp':
+        specifier: workspace:*
+        version: link:../../packages/mcp
+      '@annotatekit/server':
+        specifier: workspace:*
+        version: link:../../packages/server
+      '@modelcontextprotocol/sdk':
+        specifier: 1.32.2
+        version: 1.32.2(zod@4.6.7)
       vite:
         specifier: ^8.3.8
         version: 8.3.8(@types/node@22.20.5)

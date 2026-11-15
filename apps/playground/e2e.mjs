@@ -1,11 +1,18 @@
 // Drives the playground in real Chromium. Run after `vite build`: node e2e.mjs
+// Part one uses localStorage; part two runs the REST server and the real MCP
+// CLI and walks the whole loop: annotate, agent reads and resolves, human approves.
+import assert from "node:assert/strict";
+import { spawn } from "node:child_process";
 import { createRequire } from "node:module";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
+import { Client } from "@modelcontextprotocol/sdk/client/index.js";
+import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
+import { preview } from "vite";
 
 // require() honours NODE_PATH, so a globally installed Playwright works too.
 const { chromium } = createRequire(import.meta.url)("playwright");
-
-import assert from "node:assert/strict";
-import { preview } from "vite";
+const root = join(dirname(fileURLToPath(import.meta.url)), "../..");
 
 const shots = process.env.SHOTS_DIR;
 const server = await preview({ preview: { port: 4317, strictPort: true }, logLevel: "silent" });
@@ -13,9 +20,12 @@ const browser = await chromium.launch();
 const page = await browser.newPage({ viewport: { width: 1280, height: 800 } });
 const errors = [];
 page.on("pageerror", (e) => errors.push(e.message));
-await page.goto("http://localhost:4317/");
+const ready = () => page.waitForFunction(() => window.inspector);
+await page.goto("http://localhost:4317/?server=off");
 await page.evaluate(() => localStorage.clear());
 await page.reload();
+await ready();
+assert.equal(await page.evaluate(() => window.backend), "local");
 await page.evaluate(() => {
   window.__pageClicks = 0;
   document
@@ -174,6 +184,86 @@ await page.keyboard.press("Escape");
 assert.equal(await page.evaluate(() => window.inspector.active), false);
 await page.evaluate(() => window.inspector.destroy());
 assert.equal(await page.locator("[data-annotatekit-overlay]").count(), 0);
+
+// 12. The agent loop: REST server + the real MCP CLI over stdio.
+const API_PORT = 4748;
+const api = `http://127.0.0.1:${API_PORT}/v1`;
+const apiServer = spawn(
+  process.execPath,
+  [join(root, "packages/server/dist/cli.js"), "--db", ":memory:", "--port", String(API_PORT)],
+  { stdio: ["ignore", "ignore", "inherit"] },
+);
+try {
+  for (let i = 0; ; i++) {
+    try {
+      if ((await fetch(`${api}/health`)).ok) break;
+    } catch {}
+    if (i > 50) throw new Error("server did not start");
+    await new Promise((r) => setTimeout(r, 100));
+  }
+
+  await page.setViewportSize({ width: 1280, height: 800 });
+  await page.goto(`http://localhost:4317/?server=${encodeURIComponent(api)}`);
+  await ready();
+  assert.equal(await page.evaluate(() => window.backend), "server");
+  await page.keyboard.press("Alt+KeyA");
+  const target = await center("[data-testid=cta]");
+  await page.mouse.click(target.x, target.y);
+  await page.keyboard.type("CTA contrast is too low");
+  await page.keyboard.press("Enter");
+  await page.waitForFunction(() => document.querySelectorAll("#threads li").length === 1);
+
+  // An agent connects through the actual annotatekit-mcp CLI.
+  const agent = new Client({ name: "e2e-agent", version: "1.0.0" });
+  await agent.connect(
+    new StdioClientTransport({
+      command: process.execPath,
+      args: [join(root, "packages/mcp/dist/cli.js"), "--server", api, "--user", "Playground user"],
+    }),
+  );
+  const call = async (name, args = {}) => {
+    const res = await agent.callTool({ name, arguments: args });
+    assert.ok(!res.isError, `${name} failed: ${res.content?.[0]?.text}`);
+    return JSON.parse(res.content[0].text);
+  };
+  const listed = await call("list_threads", { projectId: "playground" });
+  const threads = listed.threads ?? listed.items ?? listed;
+  assert.equal(threads.length, 1, "agent sees the new thread");
+  const threadId = threads[0].id;
+  const context = JSON.stringify(await call("get_annotation_context", { threadId }));
+  assert.ok(context.includes("data-testid"), "agent sees the selector");
+  assert.ok(context.includes("--color-brand"), "agent sees the CSS variables");
+  assert.ok(context.includes('"xl"'), "agent sees the breakpoint");
+  const resolved = await call("resolve_thread", {
+    threadId,
+    summary: "Darkened the CTA background",
+    commitRef: "abc1234",
+  });
+  assert.equal(resolved.status, "pending_review");
+  await agent.close();
+
+  // The page hears about it live, without a reload.
+  await page.waitForFunction(() => {
+    const root = document.querySelector("[data-annotatekit-overlay]").shadowRoot;
+    return root.querySelector(".pin")?.dataset.status === "pending_review";
+  });
+  await page.waitForFunction(
+    () => document.querySelector("#threads li")?.dataset.status === "pending_review",
+  );
+  if (shots) await page.screenshot({ path: `${shots}/7-pending-review.png` });
+
+  // A human approves on the page.
+  await page.locator("#threads li button", { hasText: "Approve" }).click();
+  await page.waitForFunction(() => {
+    const root = document.querySelector("[data-annotatekit-overlay]").shadowRoot;
+    return root.querySelector(".pin")?.dataset.status === "resolved";
+  });
+  const detail = await (await fetch(`${api}/threads/${threadId}`)).json();
+  assert.equal(detail.thread.status, "resolved");
+  assert.equal(detail.thread.resolution.reviewedBy.name, "Playground user");
+} finally {
+  apiServer.kill();
+}
 
 assert.deepEqual(errors, []);
 await browser.close();

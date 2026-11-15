@@ -16,15 +16,41 @@ This is a pnpm workspace. Packages live in `packages/`, demo apps in `apps/`.
 | [`@annotatekit/client`](packages/client)       | HTTP client for the server, implementing the core service interface.                                          |
 | [`@annotatekit/mcp`](packages/mcp)             | MCP server for coding agents: read feedback, get element context, reply, resolve.                             |
 
-## Try the agent loop locally
+## Try the whole loop locally
 
 ```sh
-pnpm install && pnpm build
-node packages/server/dist/cli.js --db ./annotatekit.db          # REST API on :4747
-node packages/mcp/dist/cli.js --server http://localhost:4747/v1  # MCP over stdio
+pnpm install
+pnpm dev
 ```
 
-Agents resolve into `pending_review` by default; a human approves on the page.
+`pnpm dev` builds the packages, then runs the REST server on
+`http://localhost:4747/v1` (SQLite in `.annotatekit/dev.db`) and the playground
+on `http://localhost:5173`. The playground panel says where it is saving: the
+server when it's reachable, localStorage otherwise.
+
+1. **Annotate.** Open the playground, press <kbd>Alt</kbd>+<kbd>A</kbd> and click
+   the "Get started" button, or drag a box over the pricing cards. Type a note
+   and press Enter. The thread is saved on the server with the element's
+   selectors, text, styles, breakpoint, Tailwind classes and CSS variables.
+2. **Connect an agent.** Register the MCP server with your coding agent, for
+   example Claude Code:
+
+   ```sh
+   claude mcp add annotatekit -- node "$PWD/packages/mcp/dist/cli.js" \
+     --server http://localhost:4747/v1 --user "Your name"
+   ```
+
+   Then ask it to "work on the open AnnotateKit feedback". It calls
+   `list_threads`, reads the element with `get_annotation_context`, makes the
+   change, and calls `resolve_thread` with a summary.
+3. **Review.** The pin on the page turns to pending review straight away, with
+   no reload, because the page follows the server's event stream. Click
+   **Approve** in the panel to resolve the thread, or **Reopen** to send it
+   back. Agent resolves always wait for a human unless you start the server
+   with `--direct-resolve playground`.
+
+`pnpm --filter @annotatekit/playground test:e2e` runs this loop in headless
+Chromium against the real server and the real `annotatekit-mcp` CLI.
 
 ## Develop
 
@@ -34,12 +60,7 @@ pnpm test        # vitest
 pnpm typecheck   # tsc --noEmit across packages
 pnpm lint        # biome
 pnpm build       # emit ESM + .d.ts to packages/*/dist
-
-# Try the inspector on a demo page, backed by core's localStorage adapter
-pnpm build && pnpm --filter @annotatekit/playground dev
-
-# Drive the playground in headless Chromium (needs Playwright)
-pnpm --filter @annotatekit/playground test:e2e
+pnpm dev         # server + playground, see above
 ```
 
 Requires Node 20+ and pnpm 10.
