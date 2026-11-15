@@ -27,7 +27,26 @@ importers:
         specifier: workspace:*
         version: link:../core
 
+  packages/client:
+    dependencies:
+      '@annotatekit/core':
+        specifier: workspace:*
+        version: link:../core
+
   packages/core: {}
+
+  packages/server:
+    dependencies:
+      '@annotatekit/core':
+        specifier: workspace:*
+        version: link:../core
+      '@annotatekit/sqlite':
+        specifier: workspace:*
+        version: link:../sqlite
+    devDependencies:
+      '@annotatekit/client':
+        specifier: workspace:*
+        version: link:../client
 
   packages/sqlite:
     dependencies:
