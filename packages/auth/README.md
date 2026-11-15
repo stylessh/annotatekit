@@ -97,4 +97,31 @@ The server refuses writes when the whitelist says `readOnly`, and answers 401 wh
 
 Rules are checked in order and the first match decides; no match means deny. Matchers: `origins`, `paths` (`*` one segment, `**` any depth), `environments`, `emailDomains` (verified emails only), `groups`, `users`, `providers`, `anonymous`, `signedIn`, `agents`, `always`, `custom`, combined with `all`, `any` and `not`.
 
-Standalone sign-in (OIDC for Okta, Entra ID, Google Workspace and Auth0; magic links) comes in a later release. See the design doc for the roadmap.
+## Standalone sign-in: Okta, Entra ID, Google Workspace, any OIDC IdP
+
+For sites whose auth you don't own, the AnnotateKit backend runs its own login. One generic `oidc()` adapter covers every OIDC IdP; `okta()`, `entra()` and `google()` only fill in the issuer.
+
+```ts
+const login = createStandaloneAuth({
+  providers: [
+    okta({ domain: "acme.okta.com", clientId, clientSecret }),
+    google({ hostedDomain: "acme.com", clientId: gId, clientSecret: gSecret }),
+  ],
+  sessionSecret: process.env.SESSION_SECRET,
+  baseUrl: "https://annotatekit.acme.com/auth", // register <baseUrl>/<id>/callback at the IdP
+  allowedOrigins: ["https://*.acme.com"], // sites that may receive a session
+});
+
+createAnnotateKitServer({
+  storage,
+  auth: createServerAuth({
+    verifier: login.verifier,
+    roles: mapGroups({ resolver: ["Eng"], default: "commenter" }),
+  }),
+  mount: { "/auth": login.handler },
+});
+```
+
+The widget opens `<baseUrl>/<id>/login?origin=<page origin>` in a popup. The backend runs Authorization Code with PKCE, verifies the ID token (signature via JWKS, issuer, audience, nonce, expiry), and posts `{ type: "annotatekit:session", token, expiresAt }` back to the opener, only at an allowed origin. The IdP's tokens never reach the browser. Sessions last 8 hours; on expiry the widget opens the popup again, which most IdPs complete without a prompt.
+
+Magic links and SAML come later. See the design doc for the roadmap.
