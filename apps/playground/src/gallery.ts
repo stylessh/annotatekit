@@ -34,7 +34,8 @@ import {
 
 type Theme = "light" | "dark" | "vivid";
 let theme: Theme = "light";
-let accent = "#2d2dd8";
+/** Empty means the neutral, grayscale default. */
+let accent = "";
 const hosts: HTMLElement[] = [];
 const h = ui.elementFactory(document);
 loadOverlayFont(document);
@@ -46,7 +47,7 @@ function overlay(...content: Node[]): HTMLElement {
   const host = document.createElement("div");
   host.setAttribute("data-static", "");
   host.setAttribute("data-theme", theme);
-  host.style.setProperty("--ak-accent", accent);
+  if (accent) host.style.setProperty("--ak-accent", accent);
   const root = host.attachShadow({ mode: "open" });
   const style = document.createElement("style");
   style.textContent = OVERLAY_CSS;
@@ -96,7 +97,7 @@ function toolbar(state: Partial<ui.ToolbarState>, keys = false) {
 section(
   "toolbar",
   "Toolbar",
-  "Floats bottom-right on the accent color. Translucent white pills, no shadows or borders.",
+  "Compact and icon-only. Floats bottom-right; labels are tooltips. Grayscale by default.",
   [
     specimen("Idle", "inspector off, 3 open threads", [toolbar({})], true),
     specimen("Element mode", "inspecting", [toolbar({ active: true })], true),
@@ -447,7 +448,7 @@ nav.append(h("a", { href: "#live" }, "Live overlay"));
 
 const me: Actor = people.alan;
 const service = createAnnotateKitService({ storage: createMemoryStorage() });
-const inspector = createInspector({ theme, accentColor: accent, ignore: ".g-top, .g-nav" });
+const inspector = createInspector({ theme, ignore: ".g-top, .g-nav" });
 
 async function seed() {
   const page = pageContextFromUrl(location.href, document.title);
@@ -492,17 +493,19 @@ bindService(inspector, { service, projectId: "gallery", actor: me });
 
 // ---- Theme and accent controls ---------------------------------------------------------------
 
-const ACCENTS = ["#2d2dd8", "#7c3aed", "#e11d48", "#0f766e", "#ea580c", "#111827"];
+const ACCENTS = ["", "#2d2dd8", "#7c3aed", "#e11d48", "#0f766e", "#ea580c"];
 const accentsEl = document.getElementById("accents") as HTMLElement;
 const overlayHost = () => document.querySelector<HTMLElement>("[data-annotatekit-overlay]");
 
 function apply() {
   document.body.dataset.theme = theme;
-  document.body.style.setProperty("--g-accent", accent);
+  if (accent) document.body.style.setProperty("--g-accent", accent);
+  else document.body.style.removeProperty("--g-accent");
   const live = overlayHost();
   for (const host of [...hosts, ...(live ? [live] : [])]) {
     host.setAttribute("data-theme", theme);
-    host.style.setProperty("--ak-accent", accent);
+    if (accent) host.style.setProperty("--ak-accent", accent);
+    else host.style.removeProperty("--ak-accent");
   }
   for (const b of document.querySelectorAll<HTMLButtonElement>("#themes button")) {
     b.setAttribute("aria-pressed", String(b.dataset.theme === theme));
@@ -512,12 +515,17 @@ function apply() {
   }
   const params = new URLSearchParams(location.search);
   params.set("theme", theme);
-  params.set("accent", accent.slice(1));
+  if (accent) params.set("accent", accent.slice(1));
+  else params.delete("accent");
   history.replaceState(null, "", `?${params}${location.hash}`);
 }
 for (const color of ACCENTS) {
-  const b = h("button", { type: "button", "data-color": color, "aria-label": `Accent ${color}` });
-  b.style.setProperty("--c", color);
+  const b = h("button", {
+    type: "button",
+    "data-color": color,
+    "aria-label": color ? `Accent ${color}` : "Neutral",
+  });
+  b.style.setProperty("--c", color || "linear-gradient(135deg, #18181b 50%, #d4d4d8 50%)");
   b.onclick = () => {
     accent = color;
     apply();

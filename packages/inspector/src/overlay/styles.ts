@@ -10,7 +10,9 @@
 export const THEME_TOKENS = /* css */ `
 :host {
   /* Brand */
-  --ak-accent: #2d2dd8;
+  /* Neutral by default: near-black in light, near-white in dark. Pass
+     accentColor (or set --ak-accent) for a brand color. */
+  --ak-accent: #18181b;
   --ak-on-accent: #ffffff;
 
   /* Type */
@@ -33,14 +35,14 @@ export const THEME_TOKENS = /* css */ `
   --ak-space-4: 16px;
   --ak-panel-width: 380px;
 
-  /* Light theme: a pale surface tinted by the accent */
-  --ak-surface: color-mix(in srgb, var(--ak-accent) 7%, #f7f7f9);
-  --ak-fg: #14142b;
-  --ak-fill-rgb: 20, 20, 60;
+  /* Light theme: plain grayscale */
+  --ak-surface: #f4f4f5;
+  --ak-fg: #18181b;
+  --ak-fill-rgb: 24, 24, 27;
 
-  /* Toolbar ("chrome"): the accent, with translucent white pills on it */
-  --ak-chrome: var(--ak-accent);
-  --ak-chrome-fg: var(--ak-on-accent);
+  /* Toolbar ("chrome"): near-black with translucent white icon buttons */
+  --ak-chrome: #18181b;
+  --ak-chrome-fg: #fafafa;
   --ak-chrome-fill: rgba(255, 255, 255, 0.14);
   --ak-chrome-fill-hover: rgba(255, 255, 255, 0.22);
   --ak-chrome-fill-active: rgba(255, 255, 255, 0.34);
@@ -52,7 +54,7 @@ export const THEME_TOKENS = /* css */ `
   --ak-status-resolved: #16a34a;
   --ak-status-dismissed: #71717a;
   --ak-danger: #e11d48;
-  --ak-resolved: #8b8ba3;
+  --ak-resolved: #a1a1aa;
 
   /* Derived: every fill is the foreground at low opacity */
   --ak-fill-1: rgba(var(--ak-fill-rgb), 0.06);
@@ -66,10 +68,13 @@ export const THEME_TOKENS = /* css */ `
 `;
 
 const DARK = /* css */ `
-  --ak-surface: color-mix(in srgb, var(--ak-accent) 9%, #121216);
-  --ak-fg: #f2f2f7;
+  --ak-accent: #fafafa;
+  --ak-on-accent: #18181b;
+  --ak-surface: #18181b;
+  --ak-fg: #fafafa;
   --ak-fill-rgb: 255, 255, 255;
-  --ak-resolved: #6b6b80;
+  --ak-chrome: #27272a;
+  --ak-resolved: #52525b;
   --ak-chip-mix: 22%;
   --ak-chip-text-mix: 42%;
 `;
@@ -78,6 +83,7 @@ const DARK = /* css */ `
 const VIVID = /* css */ `
   --ak-surface: var(--ak-accent);
   --ak-fg: var(--ak-on-accent);
+  --ak-chrome: color-mix(in srgb, var(--ak-accent) 82%, #000);
   --ak-fill-rgb: 255, 255, 255;
   --ak-fill-1: rgba(255, 255, 255, 0.1);
   --ak-fill-2: rgba(255, 255, 255, 0.16);
@@ -240,39 +246,47 @@ button.btn.icon svg { width: 16px; height: 16px; }
   bottom: 16px;
   pointer-events: auto;
   display: inline-flex;
-  gap: 6px;
+  gap: 2px;
   align-items: center;
-  padding: 6px;
+  padding: 4px;
   border-radius: var(--ak-radius-pill);
   background: var(--ak-chrome);
   color: var(--ak-chrome-fg);
 }
-.toolbar button.btn {
-  min-height: 40px;
-  padding: 8px 18px;
-  background: var(--ak-chrome-fill);
+.toolbar button.btn.icon {
+  position: relative;
+  width: 32px;
+  min-height: 32px;
+  height: 32px;
+  padding: 0;
+  background: transparent;
   color: var(--ak-chrome-fg);
-  font-size: var(--ak-text-md);
 }
-.toolbar button.btn:hover { background: var(--ak-chrome-fill-hover); }
+.toolbar button.btn.icon svg { width: 17px; height: 17px; }
+.toolbar button.btn:hover { background: var(--ak-chrome-fill); }
 .toolbar button.btn[aria-pressed="true"] { background: var(--ak-chrome-fill-active); }
-.toolbar button.btn.icon { width: 40px; padding: 0; }
-.toolbar .modes { display: inline-flex; gap: 2px; padding: 2px; border-radius: var(--ak-radius-pill); background: var(--ak-chrome-fill); }
+.toolbar .modes { display: inline-flex; gap: 2px; padding: 0 2px; margin: 0 2px; border-radius: var(--ak-radius-pill); background: var(--ak-chrome-fill); }
 .toolbar .modes[hidden] { display: none; }
-.toolbar .modes button.btn { background: transparent; min-height: 36px; padding: 6px 14px; }
-.toolbar .modes button.btn:hover { background: var(--ak-chrome-fill); }
-.toolbar .modes button.btn[aria-pressed="true"] { background: var(--ak-chrome-fill-active); }
+.toolbar .modes button.btn.icon { width: 30px; height: 30px; min-height: 30px; margin: 1px 0; }
 .toolbar .bp {
-  font: 500 var(--ak-text-sm)/1 var(--ak-font);
+  font: 500 var(--ak-text-xs)/1 var(--ak-font);
   font-variant-numeric: tabular-nums;
-  opacity: .72;
-  padding: 0 10px 0 6px;
+  opacity: .6;
+  padding: 0 10px 0 4px;
+  white-space: nowrap;
 }
 .toolbar .badge {
-  min-width: 20px; height: 20px; padding: 0 6px;
+  position: absolute;
+  top: 2px;
+  right: 1px;
+  min-width: 15px;
+  height: 15px;
+  padding: 0 4px;
   border-radius: var(--ak-radius-pill);
-  background: var(--ak-chrome-fill-active);
-  font-size: var(--ak-text-xs); line-height: 20px; text-align: center;
+  background: var(--ak-chrome-fg);
+  color: var(--ak-chrome);
+  font: 600 9px/15px var(--ak-font);
+  text-align: center;
 }
 
 /* ---- Chips ------------------------------------------------------------ */
@@ -310,7 +324,7 @@ button.btn.icon svg { width: 16px; height: 16px; }
 .panel {
   position: fixed;
   right: 16px;
-  bottom: 72px;
+  bottom: 64px;
   width: min(var(--ak-panel-width), calc(100vw - 32px));
   max-height: min(600px, calc(100vh - 104px));
   overflow: auto;
