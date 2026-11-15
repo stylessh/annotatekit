@@ -79,6 +79,22 @@ if (!result.ok) return new Response(result.reason, { status: result.status });
 // result.actor is the verified author: never trust an author sent in the body.
 ```
 
+### With `@annotatekit/server`
+
+```ts
+const server = createAnnotateKitServer({
+  storage: createSqliteStorage({ path: "./annotatekit.db" }),
+  auth: createServerAuth({
+    verifier: anyVerifier(hostJwtVerifier({ secret, issuer: "shop" }), apiKeyVerifier({ store })),
+    roles: mapGroups({ admin: ["annotatekit-admins"], default: "commenter" }),
+    anonymousRead: true,
+  }),
+  whitelist: rules(allow(emailDomains(["acme.com"])), readOnly(anonymous())),
+});
+```
+
+The server refuses writes when the whitelist says `readOnly`, and answers 401 when it says `signIn`.
+
 Rules are checked in order and the first match decides; no match means deny. Matchers: `origins`, `paths` (`*` one segment, `**` any depth), `environments`, `emailDomains` (verified emails only), `groups`, `users`, `providers`, `anonymous`, `signedIn`, `agents`, `always`, `custom`, combined with `all`, `any` and `not`.
 
 Standalone sign-in (OIDC for Okta, Entra ID, Google Workspace and Auth0; magic links) comes in a later release. See the design doc for the roadmap.
