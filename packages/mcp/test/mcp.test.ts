@@ -101,6 +101,7 @@ describe("@annotatekit/mcp tools", () => {
     const client = await connect(service);
     const { tools } = await client.listTools();
     expect(tools.map((t) => t.name).sort()).toEqual([
+      "dismiss_thread",
       "get_annotation_context",
       "get_thread",
       "list_groups",
@@ -229,6 +230,39 @@ describe("@annotatekit/mcp tools", () => {
     const client = await connect(service);
     const resolved = await call(client, "resolve_thread", { threadId, summary: "Done" });
     expect(resolved.value.status).toBe("resolved");
+  });
+
+  it("dismisses a thread with a reason, and it can be reopened", async () => {
+    const client = await connect(service);
+    const missingReason = await client.callTool({
+      name: "dismiss_thread",
+      arguments: { threadId },
+    });
+    expect(missingReason.isError).toBe(true);
+
+    const dismissed = await call(client, "dismiss_thread", {
+      threadId,
+      reason: "Duplicate of the header padding thread",
+    });
+    expect(dismissed.value.status).toBe("dismissed");
+    expect((await call(client, "list_threads", { projectId: "shop" })).value.threads).toEqual([]);
+
+    const detail = await service.getThread(alan, threadId);
+    expect(detail.comments.at(-1)).toMatchObject({
+      author: { kind: "agent" },
+      body: "test-agent dismissed this thread: Duplicate of the header padding thread",
+      metadata: { event: "dismiss", tool: "dismiss_thread", source: "mcp", status: "dismissed" },
+    });
+
+    const reopened = await call(client, "reopen_thread", { threadId, reason: "Not a duplicate" });
+    expect(reopened.value.status).toBe("open");
+  });
+
+  it("needs annotations:resolve to dismiss", async () => {
+    const client = await connect(service, { scopes: ["annotations:read", "annotations:write"] });
+    const denied = await call(client, "dismiss_thread", { threadId, reason: "nope" });
+    expect(denied).toMatchObject({ isError: true, value: { error: { code: "forbidden" } } });
+    expect((await service.getThread(alan, threadId)).thread.status).toBe("open");
   });
 
   it("enforces scopes and reports stable error codes", async () => {

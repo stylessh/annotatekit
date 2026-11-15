@@ -1,0 +1,38 @@
+{
+  "name": "@annotatekit/auth-saml",
+  "version": "0.0.0",
+  "license": "MIT",
+  "description": "SAML 2.0 sign-in for AnnotateKit standalone mode, on @node-saml/node-saml.",
+  "type": "module",
+  "sideEffects": false,
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "@annotatekit/source": "./src/index.ts",
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "dependencies": {
+    "@annotatekit/auth": "workspace:*",
+    "@annotatekit/core": "workspace:*",
+    "@node-saml/node-saml": "5.2.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/stylessh/annotatekit.git",
+    "directory": "packages/auth-saml"
+  },
+  "devDependencies": {
+    "xml-crypto": "6.4.0"
+  }
+}

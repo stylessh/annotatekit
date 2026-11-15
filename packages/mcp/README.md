@@ -33,16 +33,17 @@ server's policy applies).
 
 ## Tools
 
-| Tool                     | Scope                 | What it does                                                                            |
-| ------------------------ | --------------------- | --------------------------------------------------------------------------------------- |
-| `list_threads`           | `annotations:read`    | Open threads by default; filter by project, page URL (globs), status, group, breakpoint |
-| `get_thread`             | `annotations:read`    | A thread with every comment                                                             |
-| `get_annotation_context` | `annotations:read`    | Selectors, text, rect, sanitised DOM snippet, styles, breakpoint, CSS system, source    |
-| `list_groups`            | `annotations:read`    | Groups with thread counts                                                               |
-| `reply_to_thread`        | `annotations:write`   | Post a markdown comment                                                                 |
-| `set_thread_status`      | `annotations:write`   | `in_progress` or back to `open`, posting a system comment                               |
-| `resolve_thread`         | `annotations:resolve` | Report a fix with a summary, commit/PR link and files                                   |
-| `reopen_thread`          | `annotations:resolve` | Reopen with a reason                                                                    |
+| Tool                     | Scope                 | What it does                                                                               |
+| ------------------------ | --------------------- | ------------------------------------------------------------------------------------------ |
+| `list_threads`           | `annotations:read`    | Open threads by default; filter by project, page URL (globs), status, group, breakpoint    |
+| `get_thread`             | `annotations:read`    | A thread with every comment                                                                |
+| `get_annotation_context` | `annotations:read`    | Selectors, text, rect, sanitised DOM snippet, styles, breakpoint, CSS system, source       |
+| `list_groups`            | `annotations:read`    | Groups with thread counts                                                                  |
+| `reply_to_thread`        | `annotations:write`   | Post a markdown comment                                                                    |
+| `set_thread_status`      | `annotations:write`   | `in_progress` or back to `open`, posting a system comment                                  |
+| `resolve_thread`         | `annotations:resolve` | Report a fix with a summary, commit/PR link and files                                      |
+| `dismiss_thread`         | `annotations:resolve` | Close without a change (duplicate, won't fix), with a required reason posted on the thread |
+| `reopen_thread`          | `annotations:resolve` | Reopen with a reason                                                                       |
 
 Agent resolves land in `pending_review` by default, so a human confirms on the
 page. Every write records `source: "mcp"`, the tool and the MCP client name in
