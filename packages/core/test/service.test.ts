@@ -6,6 +6,7 @@ import {
   createManualResolution,
   createMemoryStorage,
   pageContextFromUrl,
+  scopesAllow,
 } from "../src/index.js";
 import { alice } from "./fixtures.js";
 
@@ -132,12 +133,33 @@ describe("createAnnotateKitService", () => {
       status: "dismissed",
       note: "Duplicate",
     });
-    expect(actions).toEqual(["thread:update", "thread:resolve"]);
+    expect(actions).toEqual(["thread:status", "thread:resolve"]);
     expect(dismissed.status).toBe("dismissed");
     const { comments } = await service.getThread(alice, thread.id);
     expect(comments.at(-1)).toMatchObject({
       body: "Claude dismissed this thread: Duplicate",
       metadata: { event: "dismiss", status: "dismissed" },
+    });
+  });
+
+  it("lets a write-only agent pick up someone else's thread but not dismiss it", async () => {
+    const service = createAnnotateKitService({
+      storage: createMemoryStorage(),
+      authorize: (request) =>
+        request.actor?.kind === "agent"
+          ? scopesAllow(["annotations:read", "annotations:write"], request)
+          : true,
+    });
+    const { thread } = await service.createThread(alice, input());
+    const working = await service.setThreadStatus(bot, thread.id, { status: "in_progress" });
+    expect(working.status).toBe("in_progress");
+    const handedBack = await service.setThreadStatus(bot, thread.id, { status: "open" });
+    expect(handedBack.status).toBe("open");
+    await expect(
+      service.setThreadStatus(bot, thread.id, { status: "dismissed", note: "dupe" }),
+    ).rejects.toMatchObject({ code: "forbidden" });
+    await expect(service.updateThread(bot, thread.id, { title: "x" })).rejects.toMatchObject({
+      code: "forbidden",
     });
   });
 

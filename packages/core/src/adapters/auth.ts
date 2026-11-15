@@ -5,6 +5,8 @@ export type AuthAction =
   | "thread:read"
   | "thread:create"
   | "thread:update"
+  /** Pick up a thread (`in_progress`) or hand it back (`open`). */
+  | "thread:status"
   | "thread:delete"
   | "thread:resolve"
   | "comment:create"

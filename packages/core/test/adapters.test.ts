@@ -194,6 +194,12 @@ describe("scopes and roles", () => {
     expect(scopesAllow(["annotations:read"], { actor: alice, action: "comment:create" })).toBe(
       false,
     );
+    // Any writer may pick up or hand back a thread, even one they did not create.
+    expect(scopesAllow(write, { actor: agent, action: "thread:status", thread: mine })).toBe(true);
+    expect(scopesAllow(write, { actor: agent, action: "thread:update", thread: mine })).toBe(false);
+    expect(scopesAllow(["annotations:read"], { actor: agent, action: "thread:status" })).toBe(
+      false,
+    );
     expect(isAuthScope("annotations:read")).toBe(true);
     expect(isAuthScope("root")).toBe(false);
   });

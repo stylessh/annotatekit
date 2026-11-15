@@ -35,9 +35,16 @@ export const ROLE_SCOPES: Readonly<Record<Role, readonly AuthScope[]>> = {
 /** The actions each scope grants on anything, regardless of who authored it. */
 const SCOPE_ACTIONS: Readonly<Record<AuthScope, readonly AuthAction[]>> = {
   "annotations:read": ["thread:read"],
-  "annotations:write": ["thread:create", "comment:create"],
-  "annotations:resolve": ["thread:resolve", "thread:update"],
-  "annotations:moderate": ["thread:update", "thread:delete", "comment:update", "comment:delete"],
+  // Anyone who can comment can pick up a thread, so a commenter's own agent can work on feedback.
+  "annotations:write": ["thread:create", "comment:create", "thread:status"],
+  "annotations:resolve": ["thread:resolve", "thread:update", "thread:status"],
+  "annotations:moderate": [
+    "thread:update",
+    "thread:status",
+    "thread:delete",
+    "comment:update",
+    "comment:delete",
+  ],
   "project:admin": ["group:manage", "audit:read"],
 };
 
