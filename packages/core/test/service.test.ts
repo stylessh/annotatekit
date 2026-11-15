@@ -116,6 +116,31 @@ describe("createAnnotateKitService", () => {
     expect((await service.getThread(alice, thread.id)).thread.commentCount).toBe(1);
   });
 
+  it("checks thread:resolve when dismissing", async () => {
+    const actions: string[] = [];
+    const service = createAnnotateKitService({
+      storage: createMemoryStorage(),
+      authorize: ({ action }) => {
+        actions.push(action);
+        return true;
+      },
+    });
+    const { thread } = await service.createThread(alice, input());
+    actions.length = 0;
+    await service.setThreadStatus(bot, thread.id, { status: "in_progress" });
+    const dismissed = await service.setThreadStatus(bot, thread.id, {
+      status: "dismissed",
+      note: "Duplicate",
+    });
+    expect(actions).toEqual(["thread:update", "thread:resolve"]);
+    expect(dismissed.status).toBe("dismissed");
+    const { comments } = await service.getThread(alice, thread.id);
+    expect(comments.at(-1)).toMatchObject({
+      body: "Claude dismissed this thread: Duplicate",
+      metadata: { event: "dismiss", status: "dismissed" },
+    });
+  });
+
   it("applies the authorizer", async () => {
     const service = createAnnotateKitService({
       storage: createMemoryStorage(),

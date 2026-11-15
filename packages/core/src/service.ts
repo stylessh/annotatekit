@@ -369,7 +369,9 @@ export function createAnnotateKitService(
           `Use resolveThread to resolve; got status ${String(input.status)}`,
         );
       }
-      const author = await check(actor, "thread:update", { thread });
+      // Dismissing closes a thread, so it needs the same permission as resolving.
+      const action = status === "dismissed" ? "thread:resolve" : "thread:update";
+      const author = await check(actor, action, { thread });
       if (thread.status === status) return thread;
       if (!canTransition(thread.status, status)) {
         throw new AnnotateKitError(
@@ -380,10 +382,10 @@ export function createAnnotateKitService(
       const next: Thread = { ...thread, status, updatedAt: now() };
       if (status === "open") delete next.resolution;
       const stored = await storage.threads.put(next);
-      const body = input.note
-        ? `${author.name} set status to ${status}: ${input.note}`
-        : `${author.name} set status to ${status}`;
-      return systemComment(stored, author, body, "status", { ...input.metadata, status });
+      const verb = status === "dismissed" ? "dismissed this thread" : `set status to ${status}`;
+      const body = input.note ? `${author.name} ${verb}: ${input.note}` : `${author.name} ${verb}`;
+      const event = status === "dismissed" ? "dismiss" : "status";
+      return systemComment(stored, author, body, event, { ...input.metadata, status });
     },
 
     async resolveThread(actor, threadId, input = {}) {
