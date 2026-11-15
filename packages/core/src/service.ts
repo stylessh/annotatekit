@@ -9,7 +9,9 @@ import type {
   GroupQuery,
   Page,
   StorageAdapter,
+  StorageListener,
   ThreadQuery,
+  Unsubscribe,
 } from "./adapters/storage.js";
 import type { CaptureContext, ElementAnchor, Point, Rect } from "./anchor/types.js";
 import { AnnotateKitError } from "./errors.js";
@@ -134,7 +136,6 @@ export interface UpdateGroupInput {
  * {@link Actor}, so one service can serve many users.
  */
 export interface AnnotateKitService {
-  readonly storage: StorageAdapter;
   listThreads(actor: Actor | null, query?: ThreadQuery): Promise<Page<Thread>>;
   getThread(actor: Actor | null, threadId: string): Promise<ThreadDetail>;
   createThread(actor: Actor | null, input: CreateThreadInput): Promise<ThreadDetail>;
@@ -157,11 +158,21 @@ export interface AnnotateKitService {
   createGroup(actor: Actor | null, input: CreateGroupInput): Promise<Group>;
   updateGroup(actor: Actor | null, groupId: string, input: UpdateGroupInput): Promise<Group>;
   deleteGroup(actor: Actor | null, groupId: string): Promise<void>;
+
+  /** Live changes, when the backing storage can report them. */
+  subscribe?(listener: StorageListener): Unsubscribe;
+}
+
+/** A service running in this process over a {@link StorageAdapter}. */
+export interface LocalAnnotateKitService extends AnnotateKitService {
+  readonly storage: StorageAdapter;
 }
 
 const MAX_COMMENT_LENGTH = 20_000;
 
-export function createAnnotateKitService(options: AnnotateKitServiceOptions): AnnotateKitService {
+export function createAnnotateKitService(
+  options: AnnotateKitServiceOptions,
+): LocalAnnotateKitService {
   const { storage } = options;
   const resolution = options.resolution ?? createReviewResolution();
   const now = options.now ?? monotonicClock();
@@ -255,7 +266,7 @@ export function createAnnotateKitService(options: AnnotateKitServiceOptions): An
     return storage.threads.put(next);
   }
 
-  return {
+  const service: LocalAnnotateKitService = {
     storage,
 
     async listThreads(actor, query = {}) {
@@ -522,6 +533,11 @@ export function createAnnotateKitService(options: AnnotateKitServiceOptions): An
       await storage.groups.delete(groupId);
     },
   };
+  if (storage.subscribe) {
+    const subscribe = storage.subscribe.bind(storage);
+    service.subscribe = (listener) => subscribe(listener);
+  }
+  return service;
 }
 
 /**
