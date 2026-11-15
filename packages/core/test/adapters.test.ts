@@ -185,12 +185,25 @@ describe("scopes and roles", () => {
     const mine = makeThread({ createdBy: alice });
     const write = ["annotations:write"] as const;
     expect(scopesAllow(write, { actor: alice, action: "thread:resolve", thread: mine })).toBe(true);
-    expect(scopesAllow(write, { actor: agent, action: "thread:resolve", thread: mine })).toBe(
-      false,
-    );
+    // Alice's agent owns what Alice owns.
+    expect(scopesAllow(write, { actor: agent, action: "thread:resolve", thread: mine })).toBe(true);
     expect(scopesAllow(["annotations:resolve"], { actor: agent, action: "thread:resolve" })).toBe(
       true,
     );
+    // An agent acting for the author owns what the author owns, and nothing else.
+    const alicesAgent = {
+      kind: "agent",
+      id: "agent_key_1",
+      name: "Claude",
+      onBehalfOf: alice.id,
+    } as const;
+    expect(scopesAllow(write, { actor: alicesAgent, action: "thread:update", thread: mine })).toBe(
+      true,
+    );
+    const theirs = makeThread({ createdBy: { kind: "human", id: "usr_bob", name: "Bob" } });
+    expect(
+      scopesAllow(write, { actor: alicesAgent, action: "thread:update", thread: theirs }),
+    ).toBe(false);
     expect(scopesAllow(["annotations:read"], { actor: alice, action: "comment:create" })).toBe(
       false,
     );

@@ -74,7 +74,8 @@ export function highestRole(roles: Iterable<Role>): Role | undefined {
 
 /**
  * Whether `scopes` permit the request. `annotations:write` also lets an actor
- * edit, resolve and delete what they authored themselves.
+ * edit, resolve and delete what they authored themselves, or what the person
+ * they act for authored.
  */
 export function scopesAllow(scopes: Iterable<AuthScope>, request: AuthorizationRequest): boolean {
   const set = new Set(scopes);
@@ -89,10 +90,16 @@ export function scopesAllow(scopes: Iterable<AuthScope>, request: AuthorizationR
 
 function ownsTarget({ actor, action, thread, comment }: AuthorizationRequest): boolean {
   if (!actor) return false;
-  if (action.startsWith("comment:")) return comment ? sameActor(comment.author, actor) : false;
-  return thread ? sameActor(thread.createdBy, actor) : false;
+  if (action.startsWith("comment:")) return comment ? authoredBy(comment.author, actor) : false;
+  return thread ? authoredBy(thread.createdBy, actor) : false;
 }
 
-function sameActor(a: Actor, b: Actor): boolean {
-  return a.kind === b.kind && a.id === b.id;
+/**
+ * Whether `actor` counts as `author`: the same actor, or an agent acting on
+ * behalf of the human who wrote it. So someone's own agent can pick up, edit
+ * and close what they opened, and no more than they could themselves.
+ */
+function authoredBy(author: Actor, actor: Actor): boolean {
+  if (author.kind === actor.kind && author.id === actor.id) return true;
+  return author.kind === "human" && actor.kind === "agent" && actor.onBehalfOf === author.id;
 }
