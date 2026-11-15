@@ -152,6 +152,19 @@ describe("@annotatekit/mcp tools", () => {
     expect(noSnippet.value.styles).toBeUndefined();
   });
 
+  it("passes along the text a reviewer selected", async () => {
+    const input = threadInput();
+    input.annotation.metadata = {
+      inspector: { fixed: false, quote: { exact: "Pay now", prefix: "Total", suffix: "" } },
+    };
+    const { thread } = await service.createThread(alan, input);
+    const client = await connect(service);
+    const context = await call(client, "get_annotation_context", { threadId: thread.id });
+    expect(context.value.selectedText).toEqual({ exact: "Pay now", prefix: "Total" });
+    const plain = await call(client, "get_annotation_context", { threadId });
+    expect(plain.value.selectedText).toBeUndefined();
+  });
+
   it("filters by breakpoint and project scope", async () => {
     const client = await connect(service, { projects: ["shop"] });
     expect((await call(client, "list_threads", { breakpoint: "lg" })).value.threads).toEqual([]);

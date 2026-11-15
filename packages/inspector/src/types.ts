@@ -6,6 +6,7 @@ import type {
   PageContext,
   Point,
   Rect,
+  TextQuote,
   ThreadStatus,
 } from "@annotatekit/core";
 
@@ -72,6 +73,8 @@ export interface AnnotationDraft {
   targets: ElementSnapshot[];
   /** True when the anchor scrolls with the viewport rather than the document. */
   fixed: boolean;
+  /** For text selections: the quoted text, found again inside `anchor` later. */
+  quote?: TextQuote;
   context: CaptureContext;
   page: PageContext;
 }
@@ -88,6 +91,8 @@ export interface RenderableAnnotation {
   /** Extra outlined elements (multi-selections), as selectors. */
   targets?: string[];
   fixed?: boolean;
+  /** Quoted text inside the anchor, underlined on the page. */
+  quote?: Pick<TextQuote, "exact" | "prefix" | "suffix">;
   status?: ThreadStatus;
   /** Text inside the pin. Defaults to its 1-based index. */
   label?: string;

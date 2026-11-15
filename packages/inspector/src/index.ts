@@ -28,6 +28,7 @@ export {
   xpathFor,
 } from "./capture/selector.js";
 export { CAPTURED_STYLES, type CaptureOptions, Capturer } from "./capture/snapshot.js";
+export { quoteFromRange, rangeFromQuote } from "./capture/text-range.js";
 export {
   createInspector,
   draftToRenderable,

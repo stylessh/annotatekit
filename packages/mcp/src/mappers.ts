@@ -89,6 +89,8 @@ export interface AnnotationContext {
   };
   position?: { x: number; y: number };
   region?: { x: number; y: number; width: number; height: number };
+  /** For text annotations: the exact text the reviewer selected, with surrounding context. */
+  selectedText?: { exact: string; prefix?: string; suffix?: string };
   styles?: Record<string, string>;
   breakpoint: BreakpointView;
   colorScheme?: "light" | "dark";
@@ -218,6 +220,8 @@ export function toAnnotationContext(
   };
   if (annotation.position) result.position = { ...annotation.position };
   if (annotation.region) result.region = { ...annotation.region };
+  const quote = selectedText(annotation);
+  if (quote) result.selectedText = quote;
   if (include.includes("styles") && anchor.computedStyles) {
     result.styles = { ...anchor.computedStyles };
   }
@@ -297,4 +301,18 @@ function copy<S extends object, T extends object>(
     if (Array.isArray(value) && value.length === 0) continue;
     (target as Record<PropertyKey, unknown>)[key] = Array.isArray(value) ? [...value] : value;
   }
+}
+
+/** The inspector stores text selections in `metadata.inspector.quote`. */
+function selectedText(annotation: Annotation): AnnotationContext["selectedText"] | undefined {
+  const inspector = annotation.metadata?.inspector;
+  if (!inspector || typeof inspector !== "object") return undefined;
+  const quote = (inspector as { quote?: unknown }).quote;
+  if (!quote || typeof quote !== "object") return undefined;
+  const { exact, prefix, suffix } = quote as Record<string, unknown>;
+  if (typeof exact !== "string" || !exact) return undefined;
+  const out: NonNullable<AnnotationContext["selectedText"]> = { exact };
+  if (typeof prefix === "string" && prefix) out.prefix = prefix;
+  if (typeof suffix === "string" && suffix) out.suffix = suffix;
+  return out;
 }
