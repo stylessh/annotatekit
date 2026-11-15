@@ -1,4 +1,5 @@
 ---
+
 "@annotatekit/core": minor
 "@annotatekit/inspector": minor
 ---
