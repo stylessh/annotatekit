@@ -7,7 +7,11 @@ import {
   createReviewResolution,
   createStaticAuth,
   createStaticWhitelist,
+  highestRole,
   isAnnotateKitError,
+  isAuthScope,
+  scopesAllow,
+  scopesForRoles,
 } from "../src/index.js";
 import { alice, makeThread } from "./fixtures.js";
 
@@ -165,5 +169,32 @@ describe("createId", () => {
     const ids = new Set(Array.from({ length: 100 }, () => createId("thr")));
     expect(ids.size).toBe(100);
     for (const id of ids) expect(id).toMatch(/^thr_[0-9a-f]{32}$/);
+  });
+});
+
+describe("scopes and roles", () => {
+  it("expands roles to scopes and checks actions, including ownership", () => {
+    expect(scopesForRoles(["commenter"])).toEqual(["annotations:read", "annotations:write"]);
+    expect(scopesForRoles(["viewer", "resolver"])).toEqual([
+      "annotations:read",
+      "annotations:write",
+      "annotations:resolve",
+    ]);
+    expect(highestRole(["viewer", "admin", "commenter"])).toBe("admin");
+    expect(highestRole([])).toBeUndefined();
+    const mine = makeThread({ createdBy: alice });
+    const write = ["annotations:write"] as const;
+    expect(scopesAllow(write, { actor: alice, action: "thread:resolve", thread: mine })).toBe(true);
+    expect(scopesAllow(write, { actor: agent, action: "thread:resolve", thread: mine })).toBe(
+      false,
+    );
+    expect(scopesAllow(["annotations:resolve"], { actor: agent, action: "thread:resolve" })).toBe(
+      true,
+    );
+    expect(scopesAllow(["annotations:read"], { actor: alice, action: "comment:create" })).toBe(
+      false,
+    );
+    expect(isAuthScope("annotations:read")).toBe(true);
+    expect(isAuthScope("root")).toBe(false);
   });
 });

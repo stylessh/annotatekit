@@ -4,9 +4,10 @@ Leave threads, comments and feedback directly on a live website, for humans and 
 
 This is a pnpm workspace. Packages live in `packages/`.
 
-| Package                              | What it is                                                                                             |
-| ------------------------------------ | ------------------------------------------------------------------------------------------------------ |
-| [`@annotatekit/core`](packages/core) | Framework-agnostic models, element anchors, adapter interfaces and built-in storage. No DOM framework. |
+| Package                              | What it is                                                                                                    |
+| ------------------------------------ | ------------------------------------------------------------------------------------------------------------- |
+| [`@annotatekit/core`](packages/core) | Framework-agnostic models, element anchors, adapter interfaces and built-in storage. No DOM framework.        |
+| [`@annotatekit/auth`](packages/auth) | Whitelist rules, role mapping, host tokens, shared passwords, agent API keys and a server-side request guard. |
 
 ## Develop
 

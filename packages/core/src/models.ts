@@ -13,6 +13,12 @@ export interface HumanActor {
   name: string;
   email?: string;
   avatarUrl?: string;
+  /** Where this identity was verified, such as `host`, `oidc:okta`, `magic-link` or `shared-password`. */
+  provider?: string;
+  /** Whether the identity provider vouched for `email`. Email-domain rules only trust verified emails. */
+  emailVerified?: boolean;
+  /** Raw groups or roles from the identity provider or host app, before role mapping. */
+  groups?: string[];
 }
 
 /**
