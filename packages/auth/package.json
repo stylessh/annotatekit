@@ -29,5 +29,9 @@
     "type": "git",
     "url": "https://github.com/stylessh/annotatekit.git",
     "directory": "packages/auth"
+  },
+  "devDependencies": {
+    "@annotatekit/server": "workspace:*",
+    "@annotatekit/sqlite": "workspace:*"
   }
 }
