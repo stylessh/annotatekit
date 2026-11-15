@@ -1,8 +1,23 @@
 {
   "name": "@annotatekit/core",
   "version": "0.0.0",
-  "license": "MIT",
   "description": "Framework-agnostic models, element anchors and pluggable adapters for AnnotateKit.",
+  "keywords": [
+    "annotatekit",
+    "feedback",
+    "annotations",
+    "anchors"
+  ],
+  "license": "MIT",
+  "homepage": "https://github.com/stylessh/annotatekit/tree/main/packages/core#readme",
+  "bugs": {
+    "url": "https://github.com/stylessh/annotatekit/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/stylessh/annotatekit.git",
+    "directory": "packages/core"
+  },
   "type": "module",
   "sideEffects": false,
   "main": "./dist/index.js",
@@ -18,13 +33,21 @@
   "files": [
     "dist"
   ],
+  "engines": {
+    "node": ">=20"
+  },
   "scripts": {
     "build": "tsc -p tsconfig.build.json",
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
-  "repository": {
-    "type": "git",
-    "url": "https://github.com/stylessh/annotatekit.git",
-    "directory": "packages/core"
+  "publishConfig": {
+    "access": "public",
+    "exports": {
+      ".": {
+        "types": "./dist/index.d.ts",
+        "import": "./dist/index.js"
+      },
+      "./package.json": "./package.json"
+    }
   }
 }

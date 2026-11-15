@@ -1,8 +1,24 @@
 {
   "name": "@annotatekit/solid",
   "version": "0.0.0",
-  "license": "MIT",
   "description": "SolidJS bindings for the AnnotateKit inspector overlay.",
+  "keywords": [
+    "annotatekit",
+    "feedback",
+    "annotations",
+    "solid",
+    "solidjs"
+  ],
+  "license": "MIT",
+  "homepage": "https://github.com/stylessh/annotatekit/tree/main/packages/solid#readme",
+  "bugs": {
+    "url": "https://github.com/stylessh/annotatekit/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/stylessh/annotatekit.git",
+    "directory": "packages/solid"
+  },
   "type": "module",
   "sideEffects": false,
   "main": "./dist/index.js",
@@ -18,6 +34,9 @@
   "files": [
     "dist"
   ],
+  "engines": {
+    "node": ">=20"
+  },
   "scripts": {
     "build": "tsc -p tsconfig.build.json",
     "typecheck": "tsc -p tsconfig.json --noEmit"
@@ -32,9 +51,14 @@
     "@annotatekit/core": "workspace:*",
     "solid-js": "^1.9.9"
   },
-  "repository": {
-    "type": "git",
-    "url": "https://github.com/stylessh/annotatekit.git",
-    "directory": "packages/solid"
+  "publishConfig": {
+    "access": "public",
+    "exports": {
+      ".": {
+        "types": "./dist/index.d.ts",
+        "import": "./dist/index.js"
+      },
+      "./package.json": "./package.json"
+    }
   }
 }
