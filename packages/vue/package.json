@@ -1,0 +1,40 @@
+{
+  "name": "@annotatekit/vue",
+  "version": "0.0.0",
+  "license": "MIT",
+  "description": "Vue 3 bindings for the AnnotateKit inspector overlay.",
+  "type": "module",
+  "sideEffects": false,
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "@annotatekit/source": "./src/index.ts",
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "dependencies": {
+    "@annotatekit/inspector": "workspace:*"
+  },
+  "peerDependencies": {
+    "vue": ">=3.3"
+  },
+  "devDependencies": {
+    "@annotatekit/core": "workspace:*",
+    "vue": "^3.5.13"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/stylessh/annotatekit.git",
+    "directory": "packages/vue"
+  }
+}

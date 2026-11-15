@@ -1,0 +1,137 @@
+/* Design tokens, so the inspector has CSS variables to report. */
+:root {
+  --color-brand: #4f46e5;
+  --color-ink: #0f172a;
+  --color-paper: #f8fafc;
+  --radius: 10px;
+  --space-card: 20px;
+  --tw-ring-color: transparent; /* mimics Tailwind's runtime vars */
+}
+* {
+  box-sizing: border-box;
+}
+body {
+  margin: 0;
+  font:
+    16px / 1.5 system-ui,
+    sans-serif;
+  color: var(--color-ink);
+  background: var(--color-paper);
+}
+a {
+  color: var(--color-brand);
+}
+/* A hand-rolled slice of Tailwind's utility names. */
+.flex {
+  display: flex;
+}
+.grid {
+  display: grid;
+}
+.gap-2 {
+  gap: 8px;
+}
+.gap-4 {
+  gap: 16px;
+}
+.p-8 {
+  padding: 32px;
+}
+.text-sm {
+  font-size: 14px;
+}
+@media (min-width: 768px) {
+  .md\:p-16 {
+    padding: 64px;
+  }
+  .md\:text-base {
+    font-size: 16px;
+  }
+}
+.site-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 16px 32px;
+  background: white;
+  position: sticky;
+  top: 0;
+  border-bottom: 1px solid #e2e8f0;
+}
+.logo {
+  font-weight: 700;
+  text-decoration: none;
+}
+.hero__title {
+  font-size: clamp(28px, 5vw, 48px);
+  margin: 0 0 12px;
+}
+.btn {
+  padding: 10px 16px;
+  border-radius: var(--radius);
+  border: 1px solid #cbd5e1;
+  background: white;
+  font: inherit;
+  cursor: pointer;
+}
+.btn--primary {
+  background: var(--color-brand);
+  color: white;
+  border-color: transparent;
+}
+.cards {
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+}
+.card {
+  padding: var(--space-card);
+  border-radius: var(--radius);
+  background: white;
+  border: 1px solid #e2e8f0;
+}
+.price {
+  font-size: 28px;
+  font-weight: 700;
+  color: var(--color-brand);
+}
+.spacer {
+  min-height: 120vh;
+}
+.log {
+  position: fixed;
+  left: 16px;
+  bottom: 16px;
+  width: min(380px, calc(100vw - 32px));
+  max-height: 40vh;
+  overflow: auto;
+  background: #0f172a;
+  color: #e2e8f0;
+  border-radius: 10px;
+  padding: 12px;
+  font-size: 12px;
+}
+.log h2 {
+  margin: 0 0 6px;
+  font-size: 13px;
+}
+.log pre {
+  margin: 0;
+  white-space: pre-wrap;
+}
+.log ol {
+  margin: 0 0 10px;
+  padding-left: 18px;
+}
+.log li {
+  margin-bottom: 4px;
+}
+.log li button,
+.log h2 button {
+  margin-left: 6px;
+  font: inherit;
+  font-size: 11px;
+  cursor: pointer;
+}
+.log li[data-status="resolved"] {
+  opacity: 0.6;
+  text-decoration: line-through;
+}
