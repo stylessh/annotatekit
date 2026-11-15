@@ -50,7 +50,8 @@ server when it's reachable, localStorage otherwise.
    with `--direct-resolve playground`.
 
 `pnpm --filter @annotatekit/playground test:e2e` runs this loop in headless
-Chromium against the real server and the real `annotatekit-mcp` CLI.
+Chromium against the real server and the real `annotatekit-mcp` CLI. CI runs it on
+every pull request and keeps its screenshots as a build artifact.
 
 ## Develop
 
