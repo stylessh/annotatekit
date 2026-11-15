@@ -103,8 +103,9 @@ function ownsTarget({ actor, action, thread, comment }: AuthorizationRequest): b
 
 /**
  * Whether `actor` counts as `author`: the same actor, or an agent acting on
- * behalf of the human who wrote it. So someone's own agent can pick up, edit
- * and close what they opened, and no more than they could themselves.
+ * behalf of the human who wrote it. So someone's own agent can edit, resolve,
+ * dismiss and delete what they opened, and no more than they could themselves.
+ * (Picking up any thread, `thread:status`, needs no ownership.)
  */
 function authoredBy(author: Actor, actor: Actor): boolean {
   if (author.kind === actor.kind && author.id === actor.id) return true;

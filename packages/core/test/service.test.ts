@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  type Actor,
   type AgentActor,
   type CreateThreadInput,
   createAnnotateKitService,
@@ -58,7 +59,9 @@ describe("createAnnotateKitService", () => {
 
   it("sends agent fixes to pending_review and lets a human approve", async () => {
     const service = createAnnotateKitService({ storage: createMemoryStorage() });
-    const { thread } = await service.createThread(alice, input());
+    // Bob's thread: the bot acts for Alice, so it doesn't own this one.
+    const bob: Actor = { kind: "human", id: "usr_bob", name: "Bob" };
+    const { thread } = await service.createThread(bob, input());
     const working = await service.setThreadStatus(bot, thread.id, { status: "in_progress" });
     expect(working.status).toBe("in_progress");
 
@@ -150,7 +153,9 @@ describe("createAnnotateKitService", () => {
           ? scopesAllow(["annotations:read", "annotations:write"], request)
           : true,
     });
-    const { thread } = await service.createThread(alice, input());
+    // Bob's thread: the bot acts for Alice, so it doesn't own this one.
+    const bob: Actor = { kind: "human", id: "usr_bob", name: "Bob" };
+    const { thread } = await service.createThread(bob, input());
     const working = await service.setThreadStatus(bot, thread.id, { status: "in_progress" });
     expect(working.status).toBe("in_progress");
     const handedBack = await service.setThreadStatus(bot, thread.id, { status: "open" });
