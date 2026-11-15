@@ -200,9 +200,50 @@ assert.ok(
 if (shots) await page.screenshot({ path: `${shots}/4c-shadow.png` });
 await page.evaluate(() => window.scrollTo(0, 0));
 
+// 6d. Inside a same-origin iframe.
+const payBox = () =>
+  page.evaluate(() => {
+    const frame = document.getElementById("embed");
+    frame.scrollIntoView({ block: "center" });
+    const f = frame.getBoundingClientRect();
+    const b = frame.contentDocument.querySelector("button").getBoundingClientRect();
+    return {
+      x: f.x + frame.clientLeft + b.x,
+      y: f.y + frame.clientTop + b.y,
+      width: b.width,
+      height: b.height,
+    };
+  });
+let pay = await payBox();
+await page.mouse.move(pay.x + pay.width / 2, pay.y + pay.height / 2);
+assert.match((await shadow(".label"))[0].text, /^button\.pay/, "hover reaches into the iframe");
+const [hlFrame] = await shadow(".hl");
+assert.ok(
+  Math.abs(hlFrame.rect.x - pay.x) < 2 && Math.abs(hlFrame.rect.y - pay.y) < 2,
+  "highlight is in page coordinates",
+);
+await page.mouse.click(pay.x + pay.width / 2, pay.y + pay.height / 2);
+await page.keyboard.type("Use the brand color");
+await page.keyboard.press("Enter");
+d = await draft();
+assert.equal(d.kind, "pin");
+assert.equal(d.anchor.selector, '#embed >>> button[data-testid="pay"]');
+assert.equal(d.anchor.xpath, undefined);
+await page.waitForFunction(() => document.querySelectorAll("#threads li").length === 7);
+pay = await payBox();
+const framePin = (await shadow(".pin")).at(-1);
+assert.ok(
+  framePin.rect.x <= pay.x + pay.width / 2 &&
+    framePin.rect.right >= pay.x + pay.width / 2 &&
+    Math.abs(framePin.rect.y + 24 - (pay.y + pay.height / 2)) < 4,
+  "pin sits on the framed button",
+);
+if (shots) await page.screenshot({ path: `${shots}/4d-iframe.png` });
+await page.evaluate(() => window.scrollTo(0, 0));
+
 // 7. Everything was persisted through core's localStorage adapter.
-await page.waitForFunction(() => document.querySelectorAll("#threads li").length === 6);
-assert.equal((await shadow(".pin")).length, 6);
+await page.waitForFunction(() => document.querySelectorAll("#threads li").length === 7);
+assert.equal((await shadow(".pin")).length, 7);
 
 // 8. Pins follow their element on scroll.
 await page.mouse.move(5, 5);
@@ -222,7 +263,7 @@ pins = await page.evaluate(async () => {
   const root = document.querySelector("[data-annotatekit-overlay]").shadowRoot;
   return Array.from(root.querySelectorAll(".pin"), (p) => p.dataset.status);
 });
-assert.deepEqual(pins, ["resolved", "open", "open", "open", "open", "open"]);
+assert.deepEqual(pins, ["resolved", "open", "open", "open", "open", "open", "open"]);
 await page.evaluate(() => window.scrollTo(0, 0));
 const groupPin = (await shadow(".pin"))[1];
 await page.mouse.click(groupPin.rect.x + 12, groupPin.rect.y + 12);
@@ -233,8 +274,8 @@ if (shots) await page.screenshot({ path: `${shots}/5-focused-group.png` });
 // 10. Pins survive a reload, and the breakpoint follows the viewport.
 await page.setViewportSize({ width: 500, height: 800 });
 await page.reload();
-await page.waitForFunction(() => document.querySelectorAll("#threads li").length === 6);
-assert.equal((await shadow(".pin")).length, 6);
+await page.waitForFunction(() => document.querySelectorAll("#threads li").length === 7);
+assert.equal((await shadow(".pin")).length, 7);
 assert.match((await shadow(".bp"))[0].text, /^base · 500px$/);
 if (shots) await page.screenshot({ path: `${shots}/6-mobile.png` });
 

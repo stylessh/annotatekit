@@ -1,9 +1,12 @@
 import type { Point } from "@annotatekit/core";
 import {
+  clientRect,
   composedChildren,
   composedContains,
   composedParent,
   deepElementFromPoint,
+  frameDocuments,
+  frameOffset,
 } from "../capture/scope.js";
 import { resolveAnchor } from "../capture/selector.js";
 import { type CaptureOptions, Capturer } from "../capture/snapshot.js";
@@ -114,10 +117,12 @@ function unionRect(rects: DOMRect[]): Box {
   return { left, top, width: right - left, height: bottom - top };
 }
 
-function commonAncestor(els: Element[]): Element | null {
+function commonAncestor(els: Element[], root: Document): Element | null {
   const [first, ...rest] = els;
   let node: Element | null = first ?? null;
-  while (node && !rest.every((e) => node && composedContains(node, e))) node = composedParent(node);
+  while (node && !rest.every((e) => node && composedContains(node, e, root))) {
+    node = composedParent(node, root);
+  }
   return node;
 }
 
@@ -254,6 +259,14 @@ export function createInspector(options: InspectorOptions = {}): Inspector {
   /** Events on our own UI and on ignored page UI (e.g. a feedback sidebar) pass through. */
   const passesThrough = (t: EventTarget | null) =>
     isOwn(t) || (!!options.ignore && t instanceof Element && !!t.closest(options.ignore));
+  /** Page element boxes in this document's viewport, including elements inside iframes. */
+  const rectOf = (el: Element) => clientRect(el, doc);
+  /** A pointer event's position in this document's viewport, wherever it happened. */
+  const pointOf = (e: MouseEvent): Point => {
+    const d = e.view?.document;
+    const off = d && d !== doc ? frameOffset(d, doc) : { x: 0, y: 0 };
+    return { x: e.clientX + off.x, y: e.clientY + off.y };
+  };
   const scrollOffset = (fixed: boolean): Point =>
     fixed ? { x: 0, y: 0 } : { x: win.scrollX, y: win.scrollY };
 
@@ -281,7 +294,7 @@ export function createInspector(options: InspectorOptions = {}): Inspector {
       label.hidden = true;
       return;
     }
-    const r = hovered.getBoundingClientRect();
+    const r = rectOf(hovered);
     hl.hidden = false;
     place(hl, r);
     label.hidden = false;
@@ -299,7 +312,7 @@ export function createInspector(options: InspectorOptions = {}): Inspector {
     selLayer.replaceChildren(
       ...selection.map((el) => {
         const b = h("div", { class: "sel" });
-        place(b, el.getBoundingClientRect());
+        place(b, rectOf(el));
         return b;
       }),
     );
@@ -316,7 +329,7 @@ export function createInspector(options: InspectorOptions = {}): Inspector {
     // Fixed regions are stored in viewport space; bring them into document space.
     const scroll = a.fixed ? (a.anchor.scroll ?? { x: 0, y: 0 }) : { x: 0, y: 0 };
     const region = { x: a.region.x + scroll.x, y: a.region.y + scroll.y };
-    const r = el?.getBoundingClientRect();
+    const r = el ? rectOf(el) : undefined;
     if (r && anchor.width > 0 && anchor.height > 0 && r.width > 0) {
       const sx = r.width / anchor.width;
       const sy = r.height / anchor.height;
@@ -345,7 +358,11 @@ export function createInspector(options: InspectorOptions = {}): Inspector {
       range = rangeFromQuote(el, a.quote);
       quoteRanges.set(a.id, range);
     }
-    return range ? Array.from(range.getClientRects()).filter((r) => r.width > 0) : [];
+    if (!range) return [];
+    const off = frameOffset(range.startContainer.ownerDocument ?? doc, doc);
+    return Array.from(range.getClientRects())
+      .filter((r) => r.width > 0)
+      .map((r) => (off.x || off.y ? new DOMRect(r.x + off.x, r.y + off.y, r.width, r.height) : r));
   }
 
   function pinPosition(a: RenderableAnnotation): Point | null {
@@ -358,7 +375,7 @@ export function createInspector(options: InspectorOptions = {}): Inspector {
       return box ? { x: box.left + box.width, y: box.top } : null;
     }
     if (!el) return null;
-    const r = el.getBoundingClientRect();
+    const r = rectOf(el);
     if (r.width === 0 && r.height === 0) return null; // display: none
     if (a.kind === "pin" && a.position) {
       return { x: r.left + a.position.x * r.width, y: r.top + a.position.y * r.height };
@@ -422,14 +439,14 @@ export function createInspector(options: InspectorOptions = {}): Inspector {
         outlines.push(b);
       } else if (el) {
         const b = h("div", { class: "sel" });
-        place(b, el.getBoundingClientRect());
+        place(b, rectOf(el));
         outlines.push(b);
       }
       for (const s of focused.targets ?? []) {
         const t = resolveAnchor(doc, { selector: s });
         if (!t) continue;
         const b = h("div", { class: "sel" });
-        place(b, t.getBoundingClientRect());
+        place(b, rectOf(t));
         outlines.push(b);
       }
     }
@@ -459,7 +476,7 @@ export function createInspector(options: InspectorOptions = {}): Inspector {
     elementBtn.setAttribute("aria-pressed", String(mode === "element"));
     areaBtn.setAttribute("aria-pressed", String(mode === "area"));
     textBtn.setAttribute("aria-pressed", String(mode === "text"));
-    if (active) doc.documentElement.setAttribute(ACTIVE_ATTR, mode === "text" ? "text" : "");
+    if (active) setInspecting(mode === "text" ? "text" : "");
     const { breakpoint, viewport } = capturer.breakpoint();
     bpLabel.textContent = `${breakpoint.name} · ${viewport.width}px`;
   }
@@ -573,7 +590,7 @@ export function createInspector(options: InspectorOptions = {}): Inspector {
   // ---- Draft builders ----------------------------------------------------
   function pinDraft(el: Element, clientX: number, clientY: number) {
     const snap = capturer.element(el);
-    const r = el.getBoundingClientRect();
+    const r = rectOf(el);
     openComposer({
       anchorSnap: snap,
       draft: {
@@ -600,7 +617,9 @@ export function createInspector(options: InspectorOptions = {}): Inspector {
   /** A region around `els`: a multi-selection, or whatever a dragged box covers. */
   function regionDraft(els: Element[], box: Box) {
     const anchorEl =
-      commonAncestor(els) ?? pickAt(box.left + box.width / 2, box.top + box.height / 2) ?? doc.body;
+      commonAncestor(els, doc) ??
+      pickAt(box.left + box.width / 2, box.top + box.height / 2) ??
+      doc.body;
     const anchorSnap = capturer.element(anchorEl);
     const off = scrollOffset(anchorSnap.fixed);
     openComposer({
@@ -646,8 +665,7 @@ export function createInspector(options: InspectorOptions = {}): Inspector {
   function commitSelection() {
     const els = selection;
     if (els.length === 1 && els[0]) elementDraft(els[0]);
-    else if (els.length > 1)
-      regionDraft(els, unionRect(els.map((el) => el.getBoundingClientRect())));
+    else if (els.length > 1) regionDraft(els, unionRect(els.map(rectOf)));
   }
 
   function elementsInside(box: Box): Element[] {
@@ -657,7 +675,7 @@ export function createInspector(options: InspectorOptions = {}): Inspector {
     // Walk by hand rather than with a TreeWalker, which can't enter shadow roots.
     const visit = (el: Element) => {
       if (out.length >= MAX_AREA_TARGETS || isOwn(el) || isIgnored(el)) return;
-      const r = el.getBoundingClientRect();
+      const r = rectOf(el);
       const empty = r.width === 0 && r.height === 0;
       if (!empty) {
         if (r.right < box.left || r.left > right || r.bottom < box.top || r.top > bottom) {
@@ -697,15 +715,16 @@ export function createInspector(options: InspectorOptions = {}): Inspector {
 
   function onPointerMove(e: PointerEvent) {
     if (!active) return;
+    const { x: px, y: py } = pointOf(e);
     if (pressed) {
-      const dx = e.clientX - pressed.x;
-      const dy = e.clientY - pressed.y;
+      const dx = px - pressed.x;
+      const dy = py - pressed.y;
       if (!pressed.dragging && Math.hypot(dx, dy) > DRAG_THRESHOLD) pressed.dragging = true;
       if (pressed.dragging) {
         drag.hidden = false;
         place(drag, {
-          left: Math.min(pressed.x, e.clientX),
-          top: Math.min(pressed.y, e.clientY),
+          left: Math.min(pressed.x, px),
+          top: Math.min(pressed.y, py),
           width: Math.abs(dx),
           height: Math.abs(dy),
         });
@@ -714,7 +733,7 @@ export function createInspector(options: InspectorOptions = {}): Inspector {
       return;
     }
     if (pending) return;
-    const el = mode === "text" ? null : pickAt(e.clientX, e.clientY);
+    const el = mode === "text" ? null : pickAt(px, py);
     if (el !== hovered) {
       hovered = el;
       if (listeners.hover?.size) emit("hover", el ? capturer.element(el) : null);
@@ -723,6 +742,7 @@ export function createInspector(options: InspectorOptions = {}): Inspector {
   }
 
   function onPointerDown(e: PointerEvent) {
+    const { x: px, y: py } = pointOf(e);
     if (!active || e.button !== 0 || passesThrough(e.target)) return;
     swallow(e);
     if (pending) {
@@ -730,10 +750,11 @@ export function createInspector(options: InspectorOptions = {}): Inspector {
       return;
     }
     if (mode === "text") return;
-    pressed = { x: e.clientX, y: e.clientY, dragging: false };
+    pressed = { x: px, y: py, dragging: false };
   }
 
   function onPointerUp(e: PointerEvent) {
+    const { x: px, y: py } = pointOf(e);
     if (active && mode === "text" && !pending && !passesThrough(e.target)) {
       swallow(e);
       // Let the browser finish updating the selection first.
@@ -747,23 +768,23 @@ export function createInspector(options: InspectorOptions = {}): Inspector {
     drag.hidden = true;
     if (p.dragging) {
       const box: Box = {
-        left: Math.min(p.x, e.clientX),
-        top: Math.min(p.y, e.clientY),
-        width: Math.abs(e.clientX - p.x),
-        height: Math.abs(e.clientY - p.y),
+        left: Math.min(p.x, px),
+        top: Math.min(p.y, py),
+        width: Math.abs(px - p.x),
+        height: Math.abs(py - p.y),
       };
       regionDraft(elementsInside(box), box);
       return;
     }
     if (mode === "area") return;
-    const el = pickAt(e.clientX, e.clientY);
+    const el = pickAt(px, py);
     if (!el) return;
     if (e.shiftKey || e.metaKey || e.ctrlKey) {
       selection = selection.includes(el) ? selection.filter((s) => s !== el) : [...selection, el];
       schedule();
       return;
     }
-    pinDraft(el, e.clientX, e.clientY);
+    pinDraft(el, px, py);
   }
 
   function onKeyDown(e: KeyboardEvent) {
@@ -814,6 +835,62 @@ export function createInspector(options: InspectorOptions = {}): Inspector {
   doc.addEventListener("keyup", onKeyUp, capture);
   win.addEventListener("scroll", onViewportChange, { capture: true, passive: true });
   win.addEventListener("resize", onViewportChange, { passive: true });
+  // Same-origin iframes get the same listeners, so pointing inside them works too.
+  const frames = new Map<Document, () => void>();
+  function listenTo(d: Document): () => void {
+    const w = d.defaultView;
+    d.addEventListener("pointermove", onPointerMove, capture);
+    d.addEventListener("pointerdown", onPointerDown, capture);
+    d.addEventListener("pointerup", onPointerUp, capture);
+    for (const t of SWALLOWED) d.addEventListener(t, swallow, capture);
+    d.addEventListener("keydown", onKeyDown, capture);
+    d.addEventListener("keyup", onKeyUp, capture);
+    w?.addEventListener("scroll", onViewportChange, { capture: true, passive: true });
+    const style = d.createElement("style");
+    style.setAttribute("data-annotatekit-style", "");
+    style.textContent = PAGE_CSS;
+    (d.head ?? d.documentElement)?.append(style);
+    const attr = doc.documentElement.getAttribute(ACTIVE_ATTR);
+    if (attr !== null) d.documentElement?.setAttribute(ACTIVE_ATTR, attr);
+    return () => {
+      d.removeEventListener("pointermove", onPointerMove, capture);
+      d.removeEventListener("pointerdown", onPointerDown, capture);
+      d.removeEventListener("pointerup", onPointerUp, capture);
+      for (const t of SWALLOWED) d.removeEventListener(t, swallow, capture);
+      d.removeEventListener("keydown", onKeyDown, capture);
+      d.removeEventListener("keyup", onKeyUp, capture);
+      w?.removeEventListener("scroll", onViewportChange, { capture: true });
+      style.remove();
+      d.documentElement?.removeAttribute(ACTIVE_ATTR);
+    };
+  }
+  function syncFrames() {
+    if (destroyed) return;
+    const docs = frameDocuments(doc);
+    for (const [d, off] of frames) {
+      if (!docs.includes(d)) {
+        off();
+        frames.delete(d);
+      }
+    }
+    for (const d of docs) if (!frames.has(d)) frames.set(d, listenTo(d));
+  }
+  /** Marks the page (and its frames) as being inspected, for the cursor styles. */
+  function setInspecting(value: string | null) {
+    for (const d of [doc, ...frames.keys()]) {
+      if (value === null) d.documentElement?.removeAttribute(ACTIVE_ATTR);
+      else d.documentElement?.setAttribute(ACTIVE_ATTR, value);
+    }
+  }
+  // A frame's document is replaced when it loads; `load` doesn't bubble, but capture sees it.
+  const onLoad = (e: Event) => {
+    if ((e.target as Element | null)?.localName?.endsWith("frame")) {
+      syncFrames();
+      schedule();
+    }
+  };
+  doc.addEventListener("load", onLoad, capture);
+  syncFrames();
   // Layout shifts (images loading, content changing) move anchored pins.
   const ro = typeof ResizeObserver !== "undefined" ? new ResizeObserver(() => schedule()) : null;
   ro?.observe(doc.documentElement);
@@ -822,6 +899,7 @@ export function createInspector(options: InspectorOptions = {}): Inspector {
     typeof MutationObserver !== "undefined"
       ? new MutationObserver((records) => {
           if (records.every((r) => isOwn(r.target))) return;
+          syncFrames();
           resolved.clear();
           quoteRanges.clear();
           schedule();
@@ -852,7 +930,7 @@ export function createInspector(options: InspectorOptions = {}): Inspector {
     activate() {
       if (active || destroyed) return;
       active = true;
-      doc.documentElement.setAttribute(ACTIVE_ATTR, "");
+      setInspecting("");
       renderToolbar();
       schedule();
       emit("activechange", true);
@@ -865,7 +943,7 @@ export function createInspector(options: InspectorOptions = {}): Inspector {
       selection = [];
       drag.hidden = true;
       closeComposer();
-      doc.documentElement.removeAttribute(ACTIVE_ATTR);
+      setInspecting(null);
       renderToolbar();
       schedule();
       emit("activechange", false);
@@ -909,6 +987,9 @@ export function createInspector(options: InspectorOptions = {}): Inspector {
       doc.removeEventListener("keyup", onKeyUp, capture);
       win.removeEventListener("scroll", onViewportChange, { capture: true });
       win.removeEventListener("resize", onViewportChange);
+      doc.removeEventListener("load", onLoad, capture);
+      for (const off of frames.values()) off();
+      frames.clear();
       ro?.disconnect();
       mo?.disconnect();
       host.remove();
