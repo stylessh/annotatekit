@@ -14,6 +14,7 @@ export {
   splitVariants,
   tailwindInfo,
 } from "./capture/css-system.js";
+export { deepElementFromPoint, queryDeep, SCOPE_SEPARATOR } from "./capture/scope.js";
 export {
   type AnchorOptions,
   anchorFor,
