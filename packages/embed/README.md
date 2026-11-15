@@ -58,8 +58,8 @@ kit.destroy(); // remove it again
 ```
 
 In a bundled app, `import { init } from "@annotatekit/embed"` does the same
-thing, though the framework packages (`@annotatekit/react`,
-`@annotatekit/vue`) fit better there.
+thing, though the framework packages (`@annotatekit/react`, `vue`, `svelte`
+and `solid`) fit better there.
 
 ## Try it locally
 

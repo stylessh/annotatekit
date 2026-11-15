@@ -13,6 +13,8 @@ This is a pnpm workspace. Packages live in `packages/`, demo apps in `apps/`.
 | [`@annotatekit/embed`](packages/embed)         | One `<script>` tag that adds the inspector to any site, saving locally or to a server.                         |
 | [`@annotatekit/react`](packages/react)         | `<AnnotateKitInspector>` and `useInspector` for React 18+.                                                     |
 | [`@annotatekit/vue`](packages/vue)             | `<AnnotateKitInspector>` and `useInspector` for Vue 3.                                                         |
+| [`@annotatekit/svelte`](packages/svelte)       | `use:annotatekit` action and `activeStore` for Svelte 4 and 5.                                                 |
+| [`@annotatekit/solid`](packages/solid)         | `<AnnotateKitInspector>` and `useInspector` for SolidJS.                                                       |
 | [`@annotatekit/sqlite`](packages/sqlite)       | SQLite storage adapter on `node:sqlite` or `better-sqlite3`.                                                   |
 | [`@annotatekit/server`](packages/server)       | REST API, live events and the `annotatekit-server` CLI.                                                        |
 | [`@annotatekit/client`](packages/client)       | HTTP client for the server, implementing the core service interface.                                           |
