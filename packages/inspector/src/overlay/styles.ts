@@ -59,6 +59,14 @@ export const OVERLAY_CSS = /* css */ `
   border: 1.5px dashed var(--ak-accent);
   background: color-mix(in srgb, var(--ak-accent) 6%, transparent);
 }
+.mark {
+  position: fixed;
+  pointer-events: none;
+  background: color-mix(in srgb, var(--ak-accent) 18%, transparent);
+  border-bottom: 2px solid var(--ak-accent);
+}
+.mark[data-focused] { background: color-mix(in srgb, var(--ak-accent) 32%, transparent); }
+.mark[data-closed] { background: transparent; border-bottom-color: var(--ak-resolved); }
 .label {
   position: fixed;
   pointer-events: none;

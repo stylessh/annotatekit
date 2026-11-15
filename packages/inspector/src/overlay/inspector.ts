@@ -1,17 +1,19 @@
 import type { Point } from "@annotatekit/core";
 import { resolveAnchor } from "../capture/selector.js";
 import { type CaptureOptions, Capturer } from "../capture/snapshot.js";
+import { quoteFromRange, rangeFromQuote } from "../capture/text-range.js";
 import type { AnnotationDraft, ElementSnapshot, RenderableAnnotation } from "../types.js";
 import { OVERLAY_CSS } from "./styles.js";
 
-export type InspectMode = "element" | "area";
+/** `element`: click to pin, drag to box. `area`: drag only. `text`: select text to quote it. */
+export type InspectMode = "element" | "area" | "text";
 
 export interface InspectorOptions extends CaptureOptions {
   /** Where the overlay host is appended. Defaults to `document.body`. */
   container?: HTMLElement;
   /** Start in inspect mode. Default false. */
   active?: boolean;
-  /** `element` (default): click to pin, drag to box. `area`: only dragging does anything. */
+  /** `element` (default): click to pin, drag to box. `area`: only dragging does anything. `text`: select text. */
   mode?: InspectMode;
   /** Elements matching this selector, and their children, can't be picked. */
   ignore?: string;
@@ -61,7 +63,8 @@ const MAX_AREA_TARGETS = 24;
 const PIN_SIZE = 24;
 const HOST_ATTR = "data-annotatekit-overlay";
 const ACTIVE_ATTR = "data-annotatekit-inspecting";
-const PAGE_CSS = `[${ACTIVE_ATTR}], [${ACTIVE_ATTR}] * { cursor: crosshair !important; }`;
+const PAGE_CSS = `[${ACTIVE_ATTR}], [${ACTIVE_ATTR}] * { cursor: crosshair !important; }
+[${ACTIVE_ATTR}="text"], [${ACTIVE_ATTR}="text"] * { cursor: text !important; }`;
 const SWALLOWED = ["mousedown", "mouseup", "click", "dblclick", "auxclick", "contextmenu"] as const;
 
 interface Box {
@@ -155,6 +158,7 @@ export function createInspector(options: InspectorOptions = {}): Inspector {
   style.textContent = OVERLAY_CSS;
 
   const outlineLayer = h("div");
+  const markLayer = h("div");
   const selLayer = h("div");
   const hl = h("div", { class: "hl", hidden: "" });
   const label = h("div", { class: "label", hidden: "" });
@@ -192,11 +196,27 @@ export function createInspector(options: InspectorOptions = {}): Inspector {
     { type: "button", class: "btn", "data-action": "mode-area", title: "Drag to box an area" },
     "Area",
   );
+  const textBtn = h(
+    "button",
+    { type: "button", class: "btn", "data-action": "mode-text", title: "Select text to quote it" },
+    "Text",
+  );
   const bpLabel = h("span", { class: "bp", "aria-live": "polite" });
-  toolbar.append(toggleBtn, elementBtn, areaBtn, bpLabel);
+  toolbar.append(toggleBtn, elementBtn, areaBtn, textBtn, bpLabel);
   if (options.toolbar === false) toolbar.hidden = true;
 
-  shadow.append(style, outlineLayer, selLayer, hl, drag, pinLayer, label, composer, toolbar);
+  shadow.append(
+    style,
+    markLayer,
+    outlineLayer,
+    selLayer,
+    hl,
+    drag,
+    pinLayer,
+    label,
+    composer,
+    toolbar,
+  );
   (options.container ?? doc.body).append(host);
   const pageStyle = doc.createElement("style");
   pageStyle.setAttribute("data-annotatekit-style", "");
@@ -309,8 +329,23 @@ export function createInspector(options: InspectorOptions = {}): Inspector {
     };
   }
 
+  /** Live client rects of a quoted text range, if it can still be found. */
+  const quoteRanges = new Map<string, Range | null>();
+  function quoteRects(a: RenderableAnnotation, el: Element | null): DOMRect[] {
+    if (!a.quote || !el) return [];
+    let range = quoteRanges.get(a.id);
+    if (range === undefined || (range && !range.startContainer.isConnected)) {
+      range = rangeFromQuote(el, a.quote);
+      quoteRanges.set(a.id, range);
+    }
+    return range ? Array.from(range.getClientRects()).filter((r) => r.width > 0) : [];
+  }
+
   function pinPosition(a: RenderableAnnotation): Point | null {
     const el = resolveFor(a);
+    const marks = quoteRects(a, el);
+    const last = marks[marks.length - 1];
+    if (last) return { x: last.right, y: last.top };
     if (a.kind === "region") {
       const box = regionBox(a, el);
       return box ? { x: box.left + box.width, y: box.top } : null;
@@ -373,7 +408,7 @@ export function createInspector(options: InspectorOptions = {}): Inspector {
     const focused = all.find((a) => a.id === focusedId);
     if (focused) {
       const el = resolveFor(focused);
-      const box = regionBox(focused, el);
+      const box = focused.quote ? null : regionBox(focused, el);
       if (box) {
         const b = h("div", { class: "region" });
         place(b, box);
@@ -392,6 +427,20 @@ export function createInspector(options: InspectorOptions = {}): Inspector {
       }
     }
     outlineLayer.replaceChildren(...outlines);
+
+    // Underline quoted text, like comments in a document editor.
+    const marks: HTMLElement[] = [];
+    for (const a of all) {
+      if (!a.quote) continue;
+      for (const r of quoteRects(a, resolveFor(a))) {
+        const m = h("div", { class: "mark", "data-id": a.id });
+        if (focusedId === a.id) m.setAttribute("data-focused", "");
+        if (a.status === "resolved" || a.status === "dismissed") m.setAttribute("data-closed", "");
+        place(m, r);
+        marks.push(m);
+      }
+    }
+    markLayer.replaceChildren(...marks);
   }
 
   function renderToolbar() {
@@ -399,8 +448,11 @@ export function createInspector(options: InspectorOptions = {}): Inspector {
     toggleBtn.textContent = active ? "Done" : "Annotate";
     elementBtn.hidden = !active;
     areaBtn.hidden = !active;
+    textBtn.hidden = !active;
     elementBtn.setAttribute("aria-pressed", String(mode === "element"));
     areaBtn.setAttribute("aria-pressed", String(mode === "area"));
+    textBtn.setAttribute("aria-pressed", String(mode === "text"));
+    if (active) doc.documentElement.setAttribute(ACTIVE_ATTR, mode === "text" ? "text" : "");
     const { breakpoint, viewport } = capturer.breakpoint();
     bpLabel.textContent = `${breakpoint.name} · ${viewport.width}px`;
   }
@@ -441,6 +493,8 @@ export function createInspector(options: InspectorOptions = {}): Inspector {
 
   function composerTitle(draft: Pending["draft"]): string {
     const n = draft.targets.length;
+    if (draft.quote)
+      return `“${draft.quote.exact.slice(0, 60)}${draft.quote.exact.length > 60 ? "…" : ""}”`;
     if (draft.kind === "region") {
       const size = `${Math.round(draft.region?.width ?? 0)}×${Math.round(draft.region?.height ?? 0)}`;
       return `Region ${size} · ${n} element${n === 1 ? "" : "s"}`;
@@ -460,6 +514,7 @@ export function createInspector(options: InspectorOptions = {}): Inspector {
   }
 
   function closeComposer() {
+    if (pending?.draft.quote) doc.getSelection()?.removeAllRanges();
     pending = null;
     composer.hidden = true;
     schedule();
@@ -553,6 +608,34 @@ export function createInspector(options: InspectorOptions = {}): Inspector {
     });
   }
 
+  /** A region around the current text selection, quoted so it can be found again. */
+  function textDraft() {
+    if (!active || pending || mode !== "text") return;
+    const sel = doc.getSelection();
+    if (!sel || sel.isCollapsed || sel.rangeCount === 0) return;
+    const range = sel.getRangeAt(0);
+    const common = range.commonAncestorContainer;
+    const anchorEl = common instanceof Element ? common : common.parentElement;
+    if (!anchorEl || isOwn(anchorEl) || isIgnored(anchorEl)) return;
+    const quote = quoteFromRange(anchorEl, range);
+    const rects = Array.from(range.getClientRects()).filter((r) => r.width > 0 && r.height > 0);
+    if (!quote || !rects.length) return;
+    const box = unionRect(rects);
+    const anchorSnap = capturer.element(anchorEl);
+    const off = scrollOffset(anchorSnap.fixed);
+    openComposer({
+      anchorSnap,
+      draft: {
+        kind: "region",
+        anchor: anchorSnap.anchor,
+        region: { x: box.left + off.x, y: box.top + off.y, width: box.width, height: box.height },
+        targets: [anchorSnap],
+        fixed: anchorSnap.fixed,
+        quote,
+      },
+    });
+  }
+
   function commitSelection() {
     const els = selection;
     if (els.length === 1 && els[0]) elementDraft(els[0]);
@@ -589,9 +672,17 @@ export function createInspector(options: InspectorOptions = {}): Inspector {
   }
 
   // ---- Page events -------------------------------------------------------
+  /** In text mode the browser must still place the caret and extend selections. */
+  const SELECTION_EVENTS = new Set([
+    "pointerdown",
+    "pointerup",
+    "mousedown",
+    "mouseup",
+    "dblclick",
+  ]);
   const swallow = (e: Event) => {
     if (!active || passesThrough(e.target)) return;
-    e.preventDefault();
+    if (!(mode === "text" && SELECTION_EVENTS.has(e.type))) e.preventDefault();
     e.stopPropagation();
     e.stopImmediatePropagation();
   };
@@ -615,7 +706,7 @@ export function createInspector(options: InspectorOptions = {}): Inspector {
       return;
     }
     if (pending) return;
-    const el = pickAt(e.clientX, e.clientY);
+    const el = mode === "text" ? null : pickAt(e.clientX, e.clientY);
     if (el !== hovered) {
       hovered = el;
       if (listeners.hover?.size) emit("hover", el ? capturer.element(el) : null);
@@ -630,10 +721,17 @@ export function createInspector(options: InspectorOptions = {}): Inspector {
       closeComposer();
       return;
     }
+    if (mode === "text") return;
     pressed = { x: e.clientX, y: e.clientY, dragging: false };
   }
 
   function onPointerUp(e: PointerEvent) {
+    if (active && mode === "text" && !pending && !passesThrough(e.target)) {
+      swallow(e);
+      // Let the browser finish updating the selection first.
+      win.setTimeout(textDraft, 0);
+      return;
+    }
     if (!active || !pressed) return;
     swallow(e);
     const p = pressed;
@@ -690,6 +788,7 @@ export function createInspector(options: InspectorOptions = {}): Inspector {
     if (action === "toggle") api.toggle();
     else if (action === "mode-element") api.setMode("element");
     else if (action === "mode-area") api.setMode("area");
+    else if (action === "mode-text") api.setMode("text");
   });
   pinLayer.addEventListener("click", (e) => {
     const id = (e.target as Element).closest(".pin")?.getAttribute("data-id");
@@ -716,6 +815,7 @@ export function createInspector(options: InspectorOptions = {}): Inspector {
       ? new MutationObserver((records) => {
           if (records.every((r) => isOwn(r.target))) return;
           resolved.clear();
+          quoteRanges.clear();
           schedule();
         })
       : null;
@@ -776,6 +876,7 @@ export function createInspector(options: InspectorOptions = {}): Inspector {
       annotations = list;
       drafts = [];
       resolved.clear();
+      quoteRanges.clear();
       schedule();
     },
     focusAnnotation(id) {
@@ -825,5 +926,6 @@ export function draftToRenderable(id: string, draft: AnnotationDraft): Renderabl
   if (draft.position) r.position = draft.position;
   if (draft.region) r.region = draft.region;
   if (draft.targets.length > 1) r.targets = draft.targets.map((t) => t.anchor.selector);
+  if (draft.quote) r.quote = draft.quote;
   return r;
 }

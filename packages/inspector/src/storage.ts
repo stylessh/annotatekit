@@ -7,6 +7,7 @@ import {
   type ElementAnchor,
   type Group,
   type StorageAdapter,
+  type TextQuote,
   type Thread,
   type ThreadDetail,
   type ThreadStatus,
@@ -20,6 +21,8 @@ export interface InspectorAnnotationMetadata {
   fixed: boolean;
   /** Anchors of every element in a multi-element region. */
   targets?: ElementAnchor[];
+  /** The selected text, for text annotations. */
+  quote?: TextQuote;
 }
 
 export interface DraftToThreadOptions {
@@ -42,6 +45,7 @@ export function draftToThreadInput(
 ): CreateThreadInput {
   const meta: InspectorAnnotationMetadata = { fixed: draft.fixed };
   if (draft.targets.length > 1) meta.targets = draft.targets.map((t) => t.anchor);
+  if (draft.quote) meta.quote = draft.quote;
   const input: CreateThreadInput = {
     projectId: opts.projectId,
     page: draft.page,
@@ -83,6 +87,7 @@ export function toRenderable(
   if (annotation.position) r.position = annotation.position;
   if (annotation.region) r.region = annotation.region;
   if (meta.targets && meta.targets.length > 1) r.targets = meta.targets.map((t) => t.selector);
+  if (meta.quote) r.quote = meta.quote;
   if (thread.groupId) r.groupId = thread.groupId;
   if (extra.label) r.label = extra.label;
   if (extra.color) r.color = extra.color;
