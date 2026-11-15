@@ -1,4 +1,5 @@
-import type { HumanActor } from "@annotatekit/core";
+import { type AuditLog, auditActor, type HumanActor } from "@annotatekit/core";
+import { reasonOf, recordAudit } from "./audit.js";
 import { actorFromClaims, DEFAULT_AUDIENCE } from "./host.js";
 import { bearerToken, signToken, verifyToken } from "./jwt.js";
 import { type OidcProvider, pkceChallenge, randomState } from "./oidc.js";
@@ -58,6 +59,8 @@ export interface StandaloneAuthOptions {
   issuer?: string;
   /** Session lifetime in seconds. Defaults to 8 hours. */
   sessionTtlSeconds?: number;
+  /** Records each session issued and each failed sign-in as `session:issue`. */
+  audit?: AuditLog;
   now?: () => number;
 }
 
@@ -176,7 +179,17 @@ export function createStandaloneAuth(options: StandaloneAuthOptions): Standalone
         clear,
       );
     }
+    const deny = (reason: string) =>
+      recordAudit(options.audit, {
+        actor: null,
+        action: "session:issue",
+        decision: "deny",
+        reason,
+        origin,
+        details: { provider: provider.id },
+      });
     if ((params.get("state") ?? params.get("RelayState")) !== flow.state) {
+      await deny("Login state mismatch");
       return popup(origin, { type: "annotatekit:error", error: "Login state mismatch" }, clear);
     }
     try {
@@ -199,8 +212,16 @@ export function createStandaloneAuth(options: StandaloneAuthOptions): Standalone
       if (actor.groups !== undefined) claims.groups = actor.groups;
       const token = await signToken(claims, { secret: options.sessionSecret, ttlSeconds, ...now });
       const expiresAt = (options.now ?? Date.now)() + ttlSeconds * 1000;
+      await recordAudit(options.audit, {
+        actor: auditActor(actor),
+        action: "session:issue",
+        decision: "allow",
+        origin,
+        details: { provider: provider.id },
+      });
       return popup(origin, { type: "annotatekit:session", token, expiresAt }, clear);
-    } catch {
+    } catch (error) {
+      await deny(reasonOf(error));
       return popup(origin, { type: "annotatekit:error", error: "Sign-in failed" }, clear);
     }
   }

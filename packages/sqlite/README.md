@@ -29,3 +29,13 @@ server process per database file if you need live updates for every client.
 
 The adapter passes the shared storage contract suite in
 `packages/core/test/storage-contract.ts`.
+
+## Audit log
+
+`createSqliteAuditLog({ database })` keeps an append-only `<prefix>audit` table for the server's `audit` option. Pass `storage.database` to keep it in the same file:
+
+```ts
+const storage = createSqliteStorage({ database: "./annotatekit.db" });
+const audit = createSqliteAuditLog({ database: storage.database });
+createAnnotateKitServer({ storage, audit, auth });
+```

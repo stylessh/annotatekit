@@ -10,7 +10,8 @@ export type AuthAction =
   | "comment:create"
   | "comment:update"
   | "comment:delete"
-  | "group:manage";
+  | "group:manage"
+  | "audit:read";
 
 export interface AuthorizationRequest {
   actor: Actor | null;

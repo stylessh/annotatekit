@@ -1,4 +1,5 @@
 export * from "./api-keys.js";
+export { reasonOf, recordAudit } from "./audit.js";
 export * from "./guard.js";
 export * from "./host.js";
 export { bearerToken, signToken, type TokenClaims, type TokenInput, verifyToken } from "./jwt.js";
