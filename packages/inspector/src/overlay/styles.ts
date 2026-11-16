@@ -35,6 +35,12 @@ export const THEME_TOKENS = /* css */ `
   --ak-space-4: 16px;
   --ak-panel-width: 380px;
 
+  /* Motion: springs, so size and shape changes settle instead of snapping */
+  --ak-ease-fluid: cubic-bezier(0.32, 0.72, 0, 1);
+  --ak-ease-spring: cubic-bezier(0.34, 1.4, 0.64, 1);
+  --ak-dur-morph: 520ms;
+  --ak-dur-fast: 240ms;
+
   /* Light theme: plain grayscale */
   --ak-surface: #f4f4f5;
   --ak-fg: #18181b;
@@ -239,46 +245,117 @@ button.btn[aria-pressed="true"] { background: var(--ak-fill-3); }
 button.btn.icon { width: 32px; padding: 0; font-size: 18px; line-height: 1; }
 button.btn.icon svg { width: 16px; height: 16px; }
 
-/* ---- Toolbar ---------------------------------------------------------- */
+/* ---- Toolbar ----------------------------------------------------------
+ * One pill that morphs: groups expand from zero width on a spring, icons
+ * cross-fade through a blur, the mode highlight slides between buttons.
+ */
 .toolbar {
   position: fixed;
   right: 16px;
   bottom: 16px;
   pointer-events: auto;
   display: inline-flex;
-  gap: 2px;
   align-items: center;
   padding: 4px;
   border-radius: var(--ak-radius-pill);
   background: var(--ak-chrome);
   color: var(--ak-chrome-fg);
+  transition: transform var(--ak-dur-fast) var(--ak-ease-fluid);
 }
+.toolbar:active:not(:has(.bp:active)) { transform: scale(0.985); }
 .toolbar button.btn.icon {
   position: relative;
+  flex: none;
   width: 32px;
-  min-height: 32px;
   height: 32px;
+  min-height: 32px;
   padding: 0;
+  border-radius: 50%;
   background: transparent;
   color: var(--ak-chrome-fg);
+  transition: background var(--ak-dur-fast) var(--ak-ease-fluid);
 }
-.toolbar button.btn.icon svg { width: 17px; height: 17px; }
+.toolbar button.btn.icon + :is(button, .collapse, .bp) { margin-left: 2px; }
+.toolbar svg {
+  width: 18px;
+  height: 18px;
+  transition: transform var(--ak-dur-fast) var(--ak-ease-spring);
+}
 .toolbar button.btn:hover { background: var(--ak-chrome-fill); }
+.toolbar button.btn:active svg { transform: scale(0.86); }
 .toolbar button.btn[aria-pressed="true"] { background: var(--ak-chrome-fill-active); }
-.toolbar .modes { display: inline-flex; gap: 2px; padding: 0 2px; margin: 0 2px; border-radius: var(--ak-radius-pill); background: var(--ak-chrome-fill); }
-.toolbar .modes[hidden] { display: none; }
-.toolbar .modes button.btn.icon { width: 30px; height: 30px; min-height: 30px; margin: 1px 0; }
-.toolbar .bp {
-  font: 500 var(--ak-text-xs)/1 var(--ak-font);
-  font-variant-numeric: tabular-nums;
-  opacity: .6;
-  padding: 0 10px 0 4px;
-  white-space: nowrap;
+
+/* Annotate ⇄ done: both icons are stacked and morph into each other. */
+.toolbar .swap { display: grid; place-items: center; }
+.toolbar .swap > svg {
+  grid-area: 1 / 1;
+  transition:
+    opacity var(--ak-dur-fast) var(--ak-ease-fluid),
+    filter var(--ak-dur-fast) var(--ak-ease-fluid),
+    transform var(--ak-dur-morph) var(--ak-ease-spring);
 }
-.toolbar .badge {
+.toolbar [data-state="off"] .on,
+.toolbar [data-state="on"] .off {
+  opacity: 0;
+  filter: blur(3px);
+  transform: scale(0.4) rotate(-60deg);
+}
+.toolbar button.btn.icon[data-action="toggle"][aria-pressed="true"] {
+  background: var(--ak-chrome-fg);
+  color: var(--ak-chrome);
+}
+
+/* Expanding groups: a grid track animates from 0fr to 1fr, so the pill
+   follows the content's real width with no measuring. */
+.toolbar .collapse {
+  display: grid;
+  grid-template-columns: 0fr;
+  opacity: 0;
+  filter: blur(4px);
+  transition:
+    grid-template-columns var(--ak-dur-morph) var(--ak-ease-fluid),
+    opacity var(--ak-dur-fast) var(--ak-ease-fluid),
+    filter var(--ak-dur-fast) var(--ak-ease-fluid),
+    margin var(--ak-dur-morph) var(--ak-ease-fluid);
+}
+.toolbar .collapse > * { min-width: 0; overflow: hidden; }
+.toolbar .modes-wrap { margin: 0; }
+.toolbar .modes-wrap[data-open] {
+  grid-template-columns: 1fr;
+  opacity: 1;
+  filter: none;
+  margin: 0 4px;
+}
+.toolbar .modes {
+  position: relative;
+  display: flex;
+  gap: 2px;
+  padding: 2px;
+  border-radius: var(--ak-radius-pill);
+  background: var(--ak-chrome-fill);
+}
+.toolbar .modes button.btn.icon { width: 28px; height: 28px; min-height: 28px; background: transparent; }
+.toolbar .modes button.btn.icon:hover { background: transparent; opacity: 1; }
+.toolbar .modes button.btn.icon:not([aria-pressed="true"]) { opacity: 0.6; }
+.toolbar .modes button.btn.icon svg { width: 17px; height: 17px; }
+.toolbar .modes button:focus-visible { outline-offset: -2px; }
+.toolbar .indicator {
   position: absolute;
   top: 2px;
-  right: 1px;
+  left: 2px;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: var(--ak-chrome-fill-active);
+  transform: translateX(calc(var(--i, 0) * 30px));
+  transition: transform var(--ak-dur-morph) var(--ak-ease-spring);
+}
+
+/* Threads: a count that pops in and out. */
+.toolbar .badge {
+  position: absolute;
+  top: 1px;
+  right: 0;
   min-width: 15px;
   height: 15px;
   padding: 0 4px;
@@ -287,6 +364,67 @@ button.btn.icon svg { width: 16px; height: 16px; }
   color: var(--ak-chrome);
   font: 600 9px/15px var(--ak-font);
   text-align: center;
+  transform: scale(0);
+  opacity: 0;
+  transition:
+    transform var(--ak-dur-morph) var(--ak-ease-spring),
+    opacity var(--ak-dur-fast) var(--ak-ease-fluid);
+}
+.toolbar .badge[data-show] { transform: none; opacity: 1; }
+
+/* Breakpoint: a device icon; the label slides out of it on hover or focus. */
+.toolbar .bp {
+  display: inline-flex;
+  align-items: center;
+  margin-left: 2px;
+  cursor: default;
+  outline: 0;
+}
+.toolbar .bp .divider {
+  width: 1px;
+  height: 16px;
+  margin: 0 4px 0 2px;
+  background: currentColor;
+  opacity: 0.2;
+}
+.toolbar .bp .pill {
+  display: inline-flex;
+  align-items: center;
+  height: 32px;
+  padding: 0 7px;
+  border-radius: var(--ak-radius-pill);
+  opacity: 0.55;
+  transition:
+    opacity var(--ak-dur-fast) var(--ak-ease-fluid),
+    background var(--ak-dur-fast) var(--ak-ease-fluid);
+}
+.toolbar .bp .device { display: grid; place-items: center; }
+.toolbar .bp:hover .pill, .toolbar .bp:focus-visible .pill { opacity: 1; background: var(--ak-chrome-fill); }
+.toolbar .bp:focus-visible .pill { outline: 2px solid var(--ak-chrome-fg); outline-offset: -2px; }
+.toolbar .bp:hover .bp-wrap, .toolbar .bp:focus-visible .bp-wrap {
+  grid-template-columns: 1fr;
+  opacity: 1;
+  filter: none;
+}
+.toolbar .bp-text {
+  display: block;
+  padding-left: 6px;
+  font: 500 var(--ak-text-xs)/1 var(--ak-font);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+/* Panels and composers rise out of the toolbar instead of popping in. */
+@keyframes ak-rise {
+  from { opacity: 0; transform: translateY(10px) scale(0.96); filter: blur(6px); }
+}
+.panel:not([hidden]), .composer:not([hidden]) {
+  transform-origin: 100% 100%;
+  animation: ak-rise var(--ak-dur-morph) var(--ak-ease-fluid) both;
+}
+.composer:not([hidden]) { transform-origin: 0 0; animation-duration: 380ms; }
+@media (prefers-reduced-motion: reduce) {
+  .toolbar *, .toolbar, .panel, .composer { transition-duration: 0s !important; animation: none !important; }
 }
 
 /* ---- Chips ------------------------------------------------------------ */

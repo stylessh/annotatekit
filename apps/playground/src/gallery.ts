@@ -97,7 +97,7 @@ function toolbar(state: Partial<ui.ToolbarState>, keys = false) {
 section(
   "toolbar",
   "Toolbar",
-  "Compact and icon-only. Floats bottom-right; labels are tooltips. Grayscale by default.",
+  "One pill that morphs as controls appear. Hover the device icon for the breakpoint. Icons: Hugeicons.",
   [
     specimen("Idle", "inspector off, 3 open threads", [toolbar({})], true),
     specimen("Element mode", "inspecting", [toolbar({ active: true })], true),

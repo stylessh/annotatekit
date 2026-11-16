@@ -7,6 +7,7 @@ import {
   type ThreadDetail,
   type ThreadStatus,
 } from "@annotatekit/core";
+import { ICONS } from "./icons.js";
 
 /**
  * Pure DOM builders for the overlay's UI. Each takes plain data and returns
@@ -32,37 +33,23 @@ export const elementFactory =
 
 // ---- Icons ---------------------------------------------------------------
 
-const ICONS = {
-  close: "M6 6l12 12M18 6L6 18",
-  attach:
-    "M20.5 11.5l-8.1 8.1a5 5 0 01-7.1-7.1l8.5-8.5a3.3 3.3 0 014.7 4.7l-8.5 8.5a1.7 1.7 0 01-2.4-2.4l7.8-7.8",
-  back: "M15 5l-7 7 7 7",
-  send: "M5 12h13M12 5l7 7-7 7",
-  chat: "M4 5h16v11H9l-5 4z",
-  alert: "M12 8v5M12 16.5v.5M12 3l10 18H2z",
-  list: "M8 6h12M8 12h12M8 18h12M4 6h.01M4 12h.01M4 18h.01",
-  annotate: "M4 5h16v11H9l-5 4zM12 8v5M9.5 10.5h5",
-  check: "M5 12.5l4.5 4.5L19 7.5",
-  cursor: "M6 4l13 6.5-5.6 1.9L11.5 18z",
-  area: "M4 9V4h5M15 4h5v5M20 15v5h-5M9 20H4v-5",
-  text: "M5 7V5h14v2M12 5v14M9 19h6",
-  key: "M14.5 4a5.5 5.5 0 11-4.9 8L4 17.6V20h2.4v-2h2v-2h2l1.2-1.2A5.5 5.5 0 1114.5 4zM16 8h.01",
-} as const;
 export type IconName = keyof typeof ICONS;
 
+/** An inline SVG icon from the bundled Hugeicons set. */
 export function icon(doc: Document, name: IconName): SVGSVGElement {
   const ns = "http://www.w3.org/2000/svg";
   const svg = doc.createElementNS(ns, "svg");
   svg.setAttribute("viewBox", "0 0 24 24");
   svg.setAttribute("fill", "none");
   svg.setAttribute("stroke", "currentColor");
-  svg.setAttribute("stroke-width", "1.8");
-  svg.setAttribute("stroke-linecap", "round");
-  svg.setAttribute("stroke-linejoin", "round");
+  svg.setAttribute("stroke-width", "1.5");
   svg.setAttribute("aria-hidden", "true");
-  const path = doc.createElementNS(ns, "path");
-  path.setAttribute("d", ICONS[name]);
-  svg.append(path);
+  svg.setAttribute("data-icon", name);
+  for (const [tag, attrs] of ICONS[name]) {
+    const el = doc.createElementNS(ns, tag);
+    for (const [k, v] of Object.entries(attrs)) el.setAttribute(k, v);
+    svg.append(el);
+  }
   return svg;
 }
 
@@ -557,6 +544,8 @@ export interface ToolbarState {
   mode: "element" | "area" | "text";
   /** e.g. `xl · 1280px` */
   breakpoint: string;
+  /** Viewport width, to pick the device icon. */
+  width?: number;
   /** Show the threads button. */
   threads: boolean;
   threadsOpen?: boolean;
@@ -565,38 +554,69 @@ export interface ToolbarState {
   keysOpen?: boolean;
 }
 
-/** The floating toolbar's elements. Update them with {@link renderToolbarState}. */
+const MODES = ["element", "area", "text"] as const;
+
+/** The device a viewport width suggests, for the breakpoint indicator. */
+export function deviceIcon(width: number): IconName {
+  if (width < 640) return "phone";
+  if (width < 1024) return "tablet";
+  if (width < 1536) return "laptop";
+  return "desktop";
+}
+
+/**
+ * The floating toolbar: one pill that grows and shrinks as controls appear,
+ * like a dynamic island. Update it with {@link renderToolbarState}.
+ */
 export function toolbarParts(h: H, opts: { keys?: boolean } = {}): ToolbarParts {
   const el = h("div", { class: "toolbar", role: "toolbar", "aria-label": "AnnotateKit" });
   const doc = el.ownerDocument;
-  const tool = (action: string, label: string, name: IconName, pressable = true) => {
+  const tool = (action: string, label: string, name: IconName | null) => {
     const b = h("button", {
       type: "button",
       class: "btn icon",
       "data-action": action,
       "aria-label": label,
+      "aria-pressed": "false",
       title: label,
     });
-    if (pressable) b.setAttribute("aria-pressed", "false");
-    b.append(icon(doc, name));
+    if (name) b.append(icon(doc, name));
     return b;
   };
-  const toggle = tool("toggle", "Annotate", "annotate");
+  // Two icons cross-fade, so the button morphs instead of swapping.
+  const toggle = tool("toggle", "Annotate", null);
+  const swap = h("span", { class: "swap" });
+  const on = icon(doc, "check");
+  on.classList.add("on");
+  const off = icon(doc, "annotate");
+  off.classList.add("off");
+  swap.append(off, on);
+  toggle.append(swap);
+
   const element = tool("mode-element", "Element: click to pin", "cursor");
   const area = tool("mode-area", "Area: drag to box", "area");
   const text = tool("mode-text", "Text: select to quote", "text");
-  const modes = h("div", { class: "modes", role: "group", "aria-label": "Mode" });
-  modes.append(element, area, text);
-  const bp = h("span", { class: "bp", "aria-live": "polite" });
-  const threads = tool("threads", "Threads on this page", "list");
+  const modes = h("div", { class: "collapse modes-wrap" });
+  const group = h("div", { class: "modes", role: "group", "aria-label": "Mode" });
+  group.append(h("span", { class: "indicator", "aria-hidden": "true" }), element, area, text);
+  modes.append(group);
+
+  const threads = tool("threads", "Threads on this page", "threads");
   const badge = h("span", { class: "badge", "aria-hidden": "true" });
   threads.append(badge);
+  const keys = opts.keys ? tool("keys", "Agent API keys", "key") : null;
+
+  // Breakpoint: a device icon; the label slides out on hover or focus.
+  const bp = h("span", { class: "bp", tabindex: "0", role: "status" });
+  const device = h("span", { class: "device" });
+  const label = h("span", { class: "collapse bp-wrap" });
+  label.append(h("span", { class: "bp-text" }));
+  const pill = h("span", { class: "pill" });
+  pill.append(device, label);
+  bp.append(h("span", { class: "divider", "aria-hidden": "true" }), pill);
+
   el.append(toggle, modes, threads);
-  let keys: HTMLButtonElement | null = null;
-  if (opts.keys) {
-    keys = tool("keys", "Agent API keys", "key");
-    el.append(keys);
-  }
+  if (keys) el.append(keys);
   el.append(bp);
   return { el, toggle, modes, element, area, text, bp, threads, badge, keys };
 }
@@ -604,20 +624,36 @@ export function toolbarParts(h: H, opts: { keys?: boolean } = {}): ToolbarParts 
 export function renderToolbarState(parts: ToolbarParts, state: ToolbarState): void {
   const { toggle } = parts;
   toggle.setAttribute("aria-pressed", String(state.active));
+  toggle.dataset.state = state.active ? "on" : "off";
   const label = state.active ? "Done annotating" : "Annotate";
   toggle.setAttribute("aria-label", label);
   toggle.title = label;
-  toggle.replaceChildren(icon(toggle.ownerDocument, state.active ? "check" : "annotate"));
-  parts.modes.hidden = !state.active;
+
+  parts.modes.toggleAttribute("data-open", state.active);
+  parts.modes.toggleAttribute("inert", !state.active);
+  const group = parts.modes.firstElementChild as HTMLElement | null;
+  group?.style.setProperty("--i", String(MODES.indexOf(state.mode)));
   parts.element.setAttribute("aria-pressed", String(state.mode === "element"));
   parts.area.setAttribute("aria-pressed", String(state.mode === "area"));
   parts.text.setAttribute("aria-pressed", String(state.mode === "text"));
-  parts.bp.textContent = state.breakpoint;
+
+  const text = parts.bp.querySelector(".bp-text");
+  if (text) text.textContent = state.breakpoint;
+  parts.bp.setAttribute("aria-label", `Breakpoint ${state.breakpoint}`);
+  parts.bp.title = state.breakpoint;
+  const device = parts.bp.querySelector<HTMLElement>(".device");
+  const parsed = Number.parseInt(state.breakpoint.split("·")[1] ?? "", 10);
+  const name = deviceIcon(state.width ?? (Number.isNaN(parsed) ? 1280 : parsed));
+  if (device && device.dataset.icon !== name) {
+    device.dataset.icon = name;
+    device.replaceChildren(icon(device.ownerDocument, name));
+  }
+
   parts.threads.hidden = !state.threads;
   parts.threads.setAttribute("aria-pressed", String(!!state.threadsOpen));
   const n = state.unresolved ?? 0;
-  parts.badge.hidden = !n;
-  parts.badge.textContent = n > 9 ? "9+" : String(n);
+  parts.badge.toggleAttribute("data-show", n > 0);
+  if (n > 0) parts.badge.textContent = n > 9 ? "9+" : String(n);
   parts.threads.setAttribute(
     "aria-label",
     n ? `Threads on this page, ${n} unresolved` : "Threads on this page",
