@@ -256,7 +256,7 @@ button.btn.icon svg { width: 16px; height: 16px; }
   pointer-events: auto;
   display: inline-flex;
   align-items: center;
-  padding: 4px;
+  padding: 3px;
   border-radius: var(--ak-radius-pill);
   background: var(--ak-chrome);
   color: var(--ak-chrome-fg);
@@ -266,9 +266,9 @@ button.btn.icon svg { width: 16px; height: 16px; }
 .toolbar button.btn.icon {
   position: relative;
   flex: none;
-  width: 32px;
-  height: 32px;
-  min-height: 32px;
+  width: 28px;
+  height: 28px;
+  min-height: 28px;
   padding: 0;
   border-radius: 50%;
   background: transparent;
@@ -277,8 +277,8 @@ button.btn.icon svg { width: 16px; height: 16px; }
 }
 .toolbar button.btn.icon + :is(button, .collapse, .bp) { margin-left: 2px; }
 .toolbar svg {
-  width: 18px;
-  height: 18px;
+  width: 16px;
+  height: 16px;
   transition: transform var(--ak-dur-fast) var(--ak-ease-spring);
 }
 .toolbar button.btn:hover { background: var(--ak-chrome-fill); }
@@ -324,7 +324,7 @@ button.btn.icon svg { width: 16px; height: 16px; }
   grid-template-columns: 1fr;
   opacity: 1;
   filter: none;
-  margin: 0 4px;
+  margin: 0 3px;
 }
 .toolbar .modes {
   position: relative;
@@ -334,35 +334,35 @@ button.btn.icon svg { width: 16px; height: 16px; }
   border-radius: var(--ak-radius-pill);
   background: var(--ak-chrome-fill);
 }
-.toolbar .modes button.btn.icon { width: 28px; height: 28px; min-height: 28px; background: transparent; }
+.toolbar .modes button.btn.icon { width: 24px; height: 24px; min-height: 24px; background: transparent; }
 .toolbar .modes button.btn.icon:hover { background: transparent; opacity: 1; }
 .toolbar .modes button.btn.icon:not([aria-pressed="true"]) { opacity: 0.6; }
-.toolbar .modes button.btn.icon svg { width: 17px; height: 17px; }
+.toolbar .modes button.btn.icon svg { width: 15px; height: 15px; }
 .toolbar .modes button:focus-visible { outline-offset: -2px; }
 .toolbar .indicator {
   position: absolute;
   top: 2px;
   left: 2px;
-  width: 28px;
-  height: 28px;
+  width: 24px;
+  height: 24px;
   border-radius: 50%;
   background: var(--ak-chrome-fill-active);
-  transform: translateX(calc(var(--i, 0) * 30px));
+  transform: translateX(calc(var(--i, 0) * 26px));
   transition: transform var(--ak-dur-morph) var(--ak-ease-spring);
 }
 
 /* Threads: a count that pops in and out. */
 .toolbar .badge {
   position: absolute;
-  top: 1px;
-  right: 0;
-  min-width: 15px;
-  height: 15px;
+  top: -1px;
+  right: -2px;
+  min-width: 14px;
+  height: 14px;
   padding: 0 4px;
   border-radius: var(--ak-radius-pill);
   background: var(--ak-chrome-fg);
   color: var(--ak-chrome);
-  font: 600 9px/15px var(--ak-font);
+  font: 600 9px/14px var(--ak-font);
   text-align: center;
   transform: scale(0);
   opacity: 0;
@@ -382,16 +382,16 @@ button.btn.icon svg { width: 16px; height: 16px; }
 }
 .toolbar .bp .divider {
   width: 1px;
-  height: 16px;
-  margin: 0 4px 0 2px;
+  height: 14px;
+  margin: 0 3px 0 1px;
   background: currentColor;
   opacity: 0.2;
 }
 .toolbar .bp .pill {
   display: inline-flex;
   align-items: center;
-  height: 32px;
-  padding: 0 7px;
+  height: 28px;
+  padding: 0 6px;
   border-radius: var(--ak-radius-pill);
   opacity: 0.55;
   transition:
@@ -462,7 +462,7 @@ button.btn.icon svg { width: 16px; height: 16px; }
 .panel {
   position: fixed;
   right: 16px;
-  bottom: 64px;
+  bottom: 58px;
   width: min(var(--ak-panel-width), calc(100vw - 32px));
   max-height: min(600px, calc(100vh - 104px));
   overflow: auto;

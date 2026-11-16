@@ -246,7 +246,7 @@ The overlay is themed with CSS variables (`--ak-accent`, `--ak-surface`,
 `--ak-fg`, `--ak-radius-*`, `--ak-font`, …; see
 `packages/inspector/src/overlay/styles.ts`). Set them on
 `[data-annotatekit-overlay]` to restyle it. It uses a bundled Instrument Sans
-(SIL OFL 1.1) and Hugeicons icons (MIT) as plain SVG, registered under its own family name so the host page is never
+(SIL OFL 1.1) and Phosphor icons (MIT) as plain SVG, registered under its own family name so the host page is never
 affected; pass `font: false` to use the system font.
 
 Requires Node 20+ and pnpm 10. Releases are manual; see [RELEASING.md](RELEASING.md).

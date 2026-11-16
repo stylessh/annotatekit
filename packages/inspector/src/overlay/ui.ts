@@ -35,14 +35,12 @@ export const elementFactory =
 
 export type IconName = keyof typeof ICONS;
 
-/** An inline SVG icon from the bundled Hugeicons set. */
+/** An inline SVG icon from the bundled Phosphor set. */
 export function icon(doc: Document, name: IconName): SVGSVGElement {
   const ns = "http://www.w3.org/2000/svg";
   const svg = doc.createElementNS(ns, "svg");
-  svg.setAttribute("viewBox", "0 0 24 24");
-  svg.setAttribute("fill", "none");
-  svg.setAttribute("stroke", "currentColor");
-  svg.setAttribute("stroke-width", "1.5");
+  svg.setAttribute("viewBox", "0 0 256 256");
+  svg.setAttribute("fill", "currentColor");
   svg.setAttribute("aria-hidden", "true");
   svg.setAttribute("data-icon", name);
   for (const [tag, attrs] of ICONS[name]) {
