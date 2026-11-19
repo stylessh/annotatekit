@@ -97,8 +97,16 @@ export function comment(
   };
 }
 
-export const event = (author: Actor, body: string, minutesAgo: number, name: string) =>
-  comment(author, body, minutesAgo, { metadata: { system: true, event: name } });
+export const event = (
+  author: Actor,
+  body: string,
+  minutesAgo: number,
+  name: string,
+  status?: ThreadStatus,
+) =>
+  comment(author, body, minutesAgo, {
+    metadata: { system: true, event: name, ...(status ? { status } : {}) },
+  });
 
 export function thread(
   id: string,
@@ -159,14 +167,14 @@ export function conversation(status: ThreadStatus = "pending_review"): ThreadDet
       comment(people.alan, "Good catch. Phone looks fine, only tablet breaks.", 240, {
         attachments: [images[1] as CommentAttachment, images[2] as CommentAttachment],
       }),
-      event(people.claude, "Claude started working on this", 90, "status"),
+      event(people.claude, "Claude started working on this", 90, "status", "in_progress"),
       comment(
         people.claude,
         "Set `white-space: nowrap` on the CTA and reduced the hero gap from 24px to 16px at md. Spacing spec attached.",
         42,
         { attachments: [files[0] as CommentAttachment] },
       ),
-      event(people.claude, "Claude proposed a fix for review", 41, "status"),
+      event(people.claude, "Claude proposed a fix for review", 41, "status", "pending_review"),
       comment(people.maya, "Checking on my iPad now.", 3),
     ],
   };

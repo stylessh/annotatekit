@@ -79,6 +79,28 @@ export const STATUS_LABELS: Record<ThreadStatus, string> = {
   dismissed: "Dismissed",
 };
 
+/** Each status reads as a shape, so the palette can stay neutral. */
+export const STATUS_ICONS: Record<ThreadStatus, IconName> = {
+  open: "status-open",
+  in_progress: "status-progress",
+  pending_review: "status-review",
+  resolved: "status-resolved",
+  dismissed: "status-dismissed",
+};
+
+/** A status as an icon, labelled for screen readers and on hover. */
+export function statusIcon(h: H, status: ThreadStatus): HTMLSpanElement {
+  const el = h("span", {
+    class: "status-icon",
+    "data-status": status,
+    role: "img",
+    "aria-label": STATUS_LABELS[status],
+    title: STATUS_LABELS[status],
+  });
+  el.append(icon(el.ownerDocument, STATUS_ICONS[status]));
+  return el;
+}
+
 /** "now", "5m", "3h", "2d", or a short date. */
 export function relativeTime(iso: string, now: number): string {
   const t = Date.parse(iso);
@@ -112,7 +134,9 @@ function extension(name: string | undefined, mimeType: string | undefined): stri
 // ---- Small components ----------------------------------------------------
 
 export function statusChip(h: H, status: ThreadStatus): HTMLSpanElement {
-  return h("span", { class: "chip status", "data-status": status }, STATUS_LABELS[status]);
+  const el = h("span", { class: "chip status", "data-status": status });
+  el.append(icon(el.ownerDocument, STATUS_ICONS[status]), STATUS_LABELS[status]);
+  return el;
 }
 
 export function chip(h: H, text: string, opts: { mono?: boolean; title?: string } = {}) {
@@ -217,32 +241,48 @@ export interface MessageOptions {
 }
 
 const isSystem = (c: Comment) => c.metadata?.system === true;
+const STATUS_WORD = /\b(open|in_progress|pending_review|resolved|dismissed)\b/;
 
+/**
+ * One entry in a feedback thread. The first is the note itself; replies and
+ * status changes follow on a timeline, without chat bubbles.
+ */
 export function messageItem(h: H, comment: Comment, opts: MessageOptions): HTMLLIElement {
+  const time = h(
+    "time",
+    { datetime: comment.createdAt, title: new Date(comment.createdAt).toLocaleString() },
+    relativeTime(comment.createdAt, opts.now),
+  );
   if (isSystem(comment)) {
     const li = h("li", { class: "event", "data-id": comment.id });
+    const meta = comment.metadata?.status;
+    const status = (
+      typeof meta === "string" && meta in STATUS_ICONS ? meta : STATUS_WORD.exec(comment.body)?.[1]
+    ) as ThreadStatus | undefined;
+    const mark = h("span", { class: "event-mark" });
+    mark.append(icon(li.ownerDocument, status ? STATUS_ICONS[status] : "status-open"));
     li.append(
+      mark,
       h(
         "span",
-        {},
+        { class: "event-text" },
         comment.body.replace(/\b(in_progress|pending_review)\b/g, (m) =>
           STATUS_LABELS[m as ThreadStatus].toLowerCase(),
         ),
       ),
-      h("time", { datetime: comment.createdAt }, relativeTime(comment.createdAt, opts.now)),
+      time,
     );
     return li;
   }
-  const li = h("li", { class: opts.reply ? "msg reply" : "msg", "data-id": comment.id });
+  const li = h("li", { class: opts.reply ? "msg reply" : "msg note", "data-id": comment.id });
   const head = h("div", { class: "msg-head" });
   const name = opts.meId && comment.author.id === opts.meId ? "You" : comment.author.name;
   head.append(h("span", { class: "name" }, name));
-  if (comment.author.kind === "agent") head.append(h("span", { class: "chip agent" }, "Agent"));
-  const time = h(
-    "time",
-    { datetime: comment.createdAt },
-    relativeTime(comment.createdAt, opts.now),
-  );
+  if (comment.author.kind === "agent") {
+    const tag = h("span", { class: "agent-tag", title: "Agent", "aria-label": "Agent" });
+    tag.append(icon(li.ownerDocument, "agent"));
+    head.append(tag);
+  }
   if (comment.editedAt) time.textContent += " · edited";
   head.append(time);
   li.append(avatar(h, comment.author), head, h("div", { class: "msg-body" }, comment.body));
@@ -250,16 +290,12 @@ export function messageItem(h: H, comment: Comment, opts: MessageOptions): HTMLL
   return li;
 }
 
-/** The first message, then its replies, with status changes inline as events. */
+/** The note, then its replies and status changes on a timeline. */
 export function messageList(h: H, comments: Comment[], opts: Omit<MessageOptions, "reply">) {
   const ol = h("ol", { class: "messages" });
   const [first, ...rest] = comments;
   if (!first) return ol;
   ol.append(messageItem(h, first, opts));
-  const replies = rest.filter((c) => !isSystem(c)).length;
-  if (replies) {
-    ol.append(h("li", { class: "replies-label" }, `${replies} repl${replies === 1 ? "y" : "ies"}`));
-  }
   for (const c of rest) ol.append(messageItem(h, c, { ...opts, reply: true }));
   return ol;
 }
@@ -316,7 +352,8 @@ export interface ComposerParts {
 
 /**
  * A text field with an attachment tray, an attach button and a send button.
- * Used for new annotations (`variant: "new"`) and replies (`"reply"`).
+ * New annotations (`variant: "new"`) get a full editor; replies (`"reply"`)
+ * are one pill that grows with the text, with icon buttons inside it.
  */
 export function composerParts(
   h: H,
@@ -331,7 +368,6 @@ export function composerParts(
     rows: variant === "reply" ? "1" : "3",
   });
   const tray = attachmentTray(h, []);
-  field.append(textarea, tray);
   const fileInput = h("input", {
     type: "file",
     class: "file-input",
@@ -339,25 +375,36 @@ export function composerParts(
     tabindex: "-1",
     "aria-hidden": "true",
   });
-  const row = h("div", { class: "row" });
-  if (opts.attachments !== false) {
-    row.append(iconButton(h, "attach", "Attach files", "attach", "ghost"));
-  }
-  row.append(h("span", { class: "hint" }, variant === "reply" ? "" : "↵ save · ⇧↵ newline"));
-  if (variant === "new") {
-    row.append(
-      h("button", { type: "button", class: "btn ghost", "data-action": "cancel" }, "Cancel"),
-    );
-  }
-  const submit = h(
-    "button",
-    { type: "submit", class: "btn primary" },
-    variant === "reply" ? "Send" : "Save",
-  );
-  // Thread status buttons go here, next to Send.
-  if (variant === "reply") row.append(h("span", { class: "slot" }));
-  row.append(submit);
+  const attach =
+    opts.attachments !== false ? iconButton(h, "attach", "Attach files", "attach", "ghost") : null;
   const error = h("p", { class: "form-error", role: "alert" });
+
+  if (variant === "reply") {
+    const submit = h("button", {
+      type: "submit",
+      class: "btn icon primary send",
+      "aria-label": "Send",
+      title: "Send",
+    });
+    submit.append(icon(form.ownerDocument, "send"));
+    const line = h("div", { class: "line" });
+    line.append(textarea);
+    if (attach) line.append(attach);
+    line.append(submit);
+    field.append(tray, line);
+    form.append(field, error, fileInput);
+    return { form, textarea, fileInput, tray, error, submit };
+  }
+
+  field.append(textarea, tray);
+  const row = h("div", { class: "row" });
+  if (attach) row.append(attach);
+  row.append(h("span", { class: "hint" }, "↵ save · ⇧↵ newline"));
+  row.append(
+    h("button", { type: "button", class: "btn ghost", "data-action": "cancel" }, "Cancel"),
+  );
+  const submit = h("button", { type: "submit", class: "btn primary" }, "Save");
+  row.append(submit);
   form.append(field, error, row, fileInput);
   return { form, textarea, fileInput, tray, error, submit };
 }
@@ -375,13 +422,25 @@ export type ThreadListView =
   | { state: "error"; message: string }
   | { state: "ready"; items: ThreadListItem[]; now: number };
 
-/** The "Threads on this page" panel body. */
+const isClosed = (s: ThreadStatus) => s === "resolved" || s === "dismissed";
+
+/** An icon and a number, e.g. the reply count on a thread row. */
+function stat(h: H, name: IconName, text: string, label: string) {
+  const el = h("span", { class: "stat", title: label, "aria-label": label });
+  el.append(icon(el.ownerDocument, name), h("span", {}, text));
+  return el;
+}
+
+/** The "Threads on this page" panel body: one compact row per thread. */
 export function threadListPanel(h: H, view: ThreadListView): HTMLElement[] {
   const head = h("div", { class: "panel-head" });
-  head.append(
-    h("strong", {}, "Threads on this page"),
-    iconButton(h, "close", "Close", "panel-close", "ghost"),
-  );
+  const title = h("strong", { class: "title" }, "Threads");
+  head.append(title);
+  if (view.state === "ready" && view.items.length) {
+    const open = view.items.filter((i) => !isClosed(i.thread.status)).length;
+    title.append(h("span", { class: "count", title: `${open} open` }, String(open)));
+  }
+  head.append(iconButton(h, "close", "Close", "panel-close", "ghost"));
   if (view.state === "loading") return [head, loadingState(h, "Loading threads")];
   if (view.state === "error") {
     return [
@@ -411,19 +470,26 @@ export function threadListPanel(h: H, view: ThreadListView): HTMLElement[] {
       class: "item",
       "data-action": "open-thread",
       "data-id": thread.id,
+      "data-status": thread.status,
     });
-    if (thread.status === "resolved" || thread.status === "dismissed")
-      item.setAttribute("data-closed", "");
-    const sub = [
-      thread.createdBy.name,
-      `${thread.commentCount} message${thread.commentCount === 1 ? "" : "s"}`,
-      relativeTime(thread.lastCommentAt ?? thread.updatedAt, view.now),
-    ].join(" · ");
+    if (isClosed(thread.status)) item.setAttribute("data-closed", "");
+    const replies = Math.max(0, thread.commentCount - 1);
+    const side = h("span", { class: "item-side" });
+    if (replies)
+      side.append(
+        stat(h, "chat", String(replies), `${replies} repl${replies === 1 ? "y" : "ies"}`),
+      );
+    side.append(statusIcon(h, thread.status));
+    const sub = h("span", { class: "item-sub" });
+    sub.append(
+      h("span", { class: "who" }, thread.createdBy.name),
+      h("time", {}, relativeTime(thread.lastCommentAt ?? thread.updatedAt, view.now)),
+    );
     item.append(
       h("span", { class: "num" }, label),
       h("span", { class: "item-title" }, thread.title || "Untitled"),
-      statusChip(h, thread.status),
-      h("span", { class: "item-sub" }, sub),
+      side,
+      sub,
     );
     li.append(item);
     ul.append(li);
@@ -436,28 +502,33 @@ export type ThreadView =
   | { state: "error"; message: string }
   | { state: "ready"; detail: ThreadDetail; now: number; meId?: string; busy?: boolean };
 
+export interface ThreadActionSpec {
+  label: string;
+  action: string;
+  icon: IconName;
+  primary?: boolean;
+}
+
 /** Which status buttons a thread offers, by its status. */
-export function threadActions(
-  status: ThreadStatus,
-): { label: string; action: string; primary?: boolean }[] {
+export function threadActions(status: ThreadStatus): ThreadActionSpec[] {
   switch (status) {
     case "pending_review":
       return [
-        { label: "Reopen", action: "reopen" },
-        { label: "Approve", action: "approve", primary: true },
+        { label: "Reopen", action: "reopen", icon: "reopen" },
+        { label: "Approve", action: "approve", icon: "approve", primary: true },
       ];
     case "resolved":
     case "dismissed":
-      return [{ label: "Reopen", action: "reopen" }];
+      return [{ label: "Reopen", action: "reopen", icon: "reopen" }];
     default:
-      return [{ label: "Resolve", action: "resolve" }];
+      return [{ label: "Resolve", action: "resolve", icon: "status-resolved" }];
   }
 }
 
 /**
- * A thread: header with status, capture context, messages and replies, a reply
- * composer and status actions. Pass the composer from {@link composerParts}
- * so typed text survives re-renders.
+ * A feedback thread: a compact header (status, title, icon actions), where it
+ * was left, the note and its replies on a timeline, and a reply field. Pass
+ * the composer from {@link composerParts} so typed text survives re-renders.
  */
 export function threadPanel(h: H, view: ThreadView, composer?: HTMLFormElement): HTMLElement[] {
   const head = h("div", { class: "panel-head" });
@@ -479,19 +550,35 @@ export function threadPanel(h: H, view: ThreadView, composer?: HTMLFormElement):
     return [head, body];
   }
   const { thread, annotation, comments } = view.detail;
+  head.setAttribute("data-status", thread.status);
+  const actions = h("div", { class: "head-actions" });
+  for (const a of threadActions(thread.status)) {
+    const b = iconButton(h, a.icon, a.label, a.action, a.primary ? "primary" : "ghost");
+    if (view.busy) b.disabled = true;
+    actions.append(b);
+  }
+  actions.append(iconButton(h, "close", "Close", "panel-close", "ghost"));
   head.append(
+    statusIcon(h, thread.status),
     h("span", { class: "title", title: thread.title ?? "" }, thread.title || "Untitled"),
-    statusChip(h, thread.status),
-    iconButton(h, "close", "Close", "panel-close", "ghost"),
+    actions,
   );
+
   const meta = h("div", { class: "thread-meta" });
   const ctx = annotation?.context;
-  if (annotation)
-    meta.append(
-      chip(h, annotation.anchor.selector, { mono: true, title: annotation.anchor.selector }),
-    );
-  if (ctx?.breakpoint) meta.append(chip(h, `${ctx.breakpoint.name} · ${ctx.viewport.width}px`));
-  else if (ctx) meta.append(chip(h, `${ctx.viewport.width}px`));
+  if (annotation) {
+    const where = h("span", { class: "meta-item mono", title: annotation.anchor.selector });
+    where.append(icon(meta.ownerDocument, "target"), h("span", {}, annotation.anchor.selector));
+    meta.append(where);
+  }
+  if (ctx) {
+    const size = h("span", { class: "meta-item" });
+    const text = ctx.breakpoint
+      ? `${ctx.breakpoint.name} · ${ctx.viewport.width}px`
+      : `${ctx.viewport.width}px`;
+    size.append(icon(meta.ownerDocument, deviceIcon(ctx.viewport.width)), h("span", {}, text));
+    meta.append(size);
+  }
 
   const body = h("div", { class: "thread-body" });
   body.append(
@@ -501,25 +588,9 @@ export function threadPanel(h: H, view: ThreadView, composer?: HTMLFormElement):
   );
 
   const foot = h("div", { class: "thread-foot" });
-  const slot = composer?.querySelector(".slot");
-  const actions = slot ?? h("div", { class: "thread-actions" });
-  actions.replaceChildren();
-  for (const a of threadActions(thread.status)) {
-    const b = h(
-      "button",
-      {
-        type: "button",
-        class: slot || !a.primary ? "btn" : "btn primary",
-        "data-action": a.action,
-      },
-      a.label,
-    );
-    if (view.busy) b.disabled = true;
-    actions.append(b);
-  }
   if (composer) foot.append(composer);
-  if (!slot) foot.append(actions);
-  return meta.childElementCount ? [head, meta, body, foot] : [head, body, foot];
+  const parts = meta.childElementCount ? [head, meta, body] : [head, body];
+  return composer ? [...parts, foot] : parts;
 }
 
 // ---- Toolbar ---------------------------------------------------------------

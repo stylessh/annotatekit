@@ -168,6 +168,53 @@ export interface ThreadsPanelOptions {
 
 const message = (e: unknown) => (e instanceof Error ? e.message : String(e));
 
+const EASE_FLUID = "cubic-bezier(0.32, 0.72, 0, 1)";
+
+function reducedMotion(el: Element): boolean {
+  const view = el.ownerDocument.defaultView;
+  return !!view?.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
+}
+
+function canAnimate(el: Element): boolean {
+  return typeof (el as HTMLElement).animate === "function" && !reducedMotion(el);
+}
+
+/**
+ * Replace a panel's content and morph its height from the old size to the new
+ * one, so views and new replies grow or shrink the panel smoothly. `slide`
+ * also brings the new content in from that side (1 = from the right).
+ */
+export function morphPanel(el: HTMLElement, update: () => void, slide = 0) {
+  const before = el.hidden ? 0 : el.getBoundingClientRect().height;
+  update();
+  if (!before || el.hidden || !canAnimate(el)) return;
+  const after = el.getBoundingClientRect().height;
+  if (Math.abs(after - before) > 1) {
+    const overflow = el.style.overflow;
+    el.style.overflow = "hidden";
+    const anim = el.animate([{ height: `${before}px` }, { height: `${after}px` }], {
+      duration: 460,
+      easing: EASE_FLUID,
+    });
+    const done = () => {
+      el.style.overflow = overflow;
+    };
+    anim.addEventListener("finish", done);
+    anim.addEventListener("cancel", done);
+  }
+  if (slide) {
+    for (const child of Array.from(el.children)) {
+      (child as HTMLElement).animate(
+        [
+          { opacity: 0, transform: `translateX(${slide * 14}px)`, filter: "blur(3px)" },
+          { opacity: 1, transform: "none", filter: "blur(0)" },
+        ],
+        { duration: 380, easing: EASE_FLUID },
+      );
+    }
+  }
+}
+
 export function createThreadsPanel(h: H, opts: ThreadsPanelOptions): ThreadsPanel {
   const now = opts.now ?? Date.now;
   const el = h("section", {
@@ -188,16 +235,83 @@ export function createThreadsPanel(h: H, opts: ThreadsPanelOptions): ThreadsPane
   let threadView: ThreadView = { state: "loading" };
   /** Drops responses that arrive after the user moved on. */
   let generation = 0;
+  /** Which view is drawn, so a change of view slides instead of morphing in place. */
+  let drawn: string | null = null;
+  /** Messages already shown in this thread; anything else animates in. */
+  let seen = new Set<string>();
+  let exit: Animation | null = null;
 
   function render() {
-    el.hidden = view === null;
-    el.classList.toggle("thread", view === "thread");
-    if (view === "list") el.replaceChildren(...threadListPanel(h, listView));
-    else if (view === "thread") {
-      el.replaceChildren(
-        ...threadPanel(h, threadView, threadView.state === "ready" ? reply.form : undefined),
-      );
+    const key = view === "thread" ? `thread:${threadId}` : view;
+    const slide = drawn && key && drawn !== key ? (view === "thread" ? 1 : -1) : 0;
+    drawn = key;
+    if (view === null) {
+      el.hidden = true;
+      return;
     }
+    exit?.cancel();
+    exit = null;
+    morphPanel(
+      el,
+      () => {
+        el.hidden = false;
+        el.classList.toggle("thread", view === "thread");
+        if (view === "list") el.replaceChildren(...threadListPanel(h, listView));
+        else {
+          // Same thread re-rendered: keep the reader's scroll position.
+          const kept = slide ? 0 : (el.querySelector(".thread-body")?.scrollTop ?? 0);
+          el.replaceChildren(
+            ...threadPanel(h, threadView, threadView.state === "ready" ? reply.form : undefined),
+          );
+          const body = el.querySelector(".thread-body");
+          if (body && kept) body.scrollTop = kept;
+          markNew();
+        }
+      },
+      slide,
+    );
+  }
+
+  /** Mark which edges of the thread body have more to scroll, for the fade. */
+  function edges() {
+    const body = el.querySelector<HTMLElement>(".thread-body");
+    if (!body) return;
+    const update = () => {
+      body.toggleAttribute("data-more-above", body.scrollTop > 2);
+      body.toggleAttribute(
+        "data-more-below",
+        body.scrollHeight - body.scrollTop - body.clientHeight > 2,
+      );
+    };
+    body.addEventListener("scroll", update, { passive: true });
+    update();
+  }
+
+  /** Flag replies that weren't on screen before, so they settle in. */
+  function markNew() {
+    if (threadView.state !== "ready") return;
+    const ids = threadView.detail.comments.map((c) => c.id);
+    const first = seen.size === 0;
+    for (const li of Array.from(el.querySelectorAll<HTMLElement>(".messages > [data-id]"))) {
+      const id = li.getAttribute("data-id") ?? "";
+      if (!first && !seen.has(id)) li.setAttribute("data-new", "");
+    }
+    seen = new Set(ids);
+  }
+
+  let settled = 0;
+  /**
+   * Show the loading state only if the answer is slow, so a fast load goes
+   * straight from the old view to the new one in a single morph.
+   */
+  function loadingSoon(gen: number, set: () => void) {
+    const show = () => {
+      if (gen !== generation || settled === gen) return;
+      set();
+      render();
+    };
+    if (el.hidden && drawn === null) show();
+    else setTimeout(show, 140);
   }
 
   async function load(quiet: boolean) {
@@ -205,10 +319,7 @@ export function createThreadsPanel(h: H, opts: ThreadsPanelOptions): ThreadsPane
     const src = source;
     if (!src || view === null) return;
     if (view === "list") {
-      if (!quiet) {
-        listView = { state: "loading" };
-        render();
-      }
+      if (!quiet) loadingSoon(gen, () => (listView = { state: "loading" }));
       try {
         const threads = await src.list();
         if (gen !== generation) return;
@@ -222,10 +333,7 @@ export function createThreadsPanel(h: H, opts: ThreadsPanelOptions): ThreadsPane
       }
     } else if (threadId) {
       const id = threadId;
-      if (!quiet) {
-        threadView = { state: "loading" };
-        render();
-      }
+      if (!quiet) loadingSoon(gen, () => (threadView = { state: "loading" }));
       try {
         const detail = await src.get(id);
         if (gen !== generation) return;
@@ -236,9 +344,11 @@ export function createThreadsPanel(h: H, opts: ThreadsPanelOptions): ThreadsPane
         threadView = { state: "error", message: message(e) };
       }
     }
+    settled = gen;
     render();
     const body = el.querySelector(".thread-body");
     if (body && !quiet) body.scrollTop = body.scrollHeight;
+    edges();
     // Images grow the list as they load; stay pinned to the newest message.
     body?.addEventListener(
       "load",
@@ -246,6 +356,7 @@ export function createThreadsPanel(h: H, opts: ThreadsPanelOptions): ThreadsPane
         if (body.scrollHeight - body.scrollTop - body.clientHeight < 400) {
           body.scrollTop = body.scrollHeight;
         }
+        edges();
       },
       true,
     );
@@ -271,7 +382,10 @@ export function createThreadsPanel(h: H, opts: ThreadsPanelOptions): ThreadsPane
       files.clear();
       await load(true);
       const scroller = el.querySelector(".thread-body");
-      if (scroller) scroller.scrollTop = scroller.scrollHeight;
+      scroller?.scrollTo?.({
+        top: scroller.scrollHeight,
+        behavior: reducedMotion(el) ? "auto" : "smooth",
+      });
     } catch (e) {
       files.setUploading(false);
       reply.error.textContent = message(e);
@@ -350,7 +464,10 @@ export function createThreadsPanel(h: H, opts: ThreadsPanelOptions): ThreadsPane
       void load(false);
     },
     showThread(id) {
-      if (threadId !== id) reset();
+      if (threadId !== id) {
+        reset();
+        seen = new Set();
+      }
       view = "thread";
       threadId = id;
       opts.onThreadChange?.(id);
@@ -362,8 +479,23 @@ export function createThreadsPanel(h: H, opts: ThreadsPanelOptions): ThreadsPane
       view = null;
       threadId = null;
       generation++;
+      seen = new Set();
       reset();
-      render();
+      if (canAnimate(el) && !el.hidden) {
+        const out = el.animate(
+          [
+            { opacity: 1, transform: "none", filter: "blur(0)" },
+            { opacity: 0, transform: "translateY(8px) scale(0.97)", filter: "blur(4px)" },
+          ],
+          { duration: 200, easing: EASE_FLUID },
+        );
+        exit = out;
+        out.addEventListener("finish", () => {
+          exit = null;
+          if (view === null) render();
+        });
+      } else render();
+      drawn = null;
       if (hadThread) opts.onThreadChange?.(null);
     },
     refresh() {
