@@ -257,7 +257,7 @@ button.btn.icon svg { width: 16px; height: 16px; }
   pointer-events: auto;
   display: inline-flex;
   align-items: center;
-  padding: 3px;
+  padding: 2px;
   border-radius: var(--ak-radius-pill);
   background: var(--ak-chrome);
   color: var(--ak-chrome-fg);
@@ -267,19 +267,19 @@ button.btn.icon svg { width: 16px; height: 16px; }
 .toolbar button.btn.icon {
   position: relative;
   flex: none;
-  width: 28px;
-  height: 28px;
-  min-height: 28px;
+  width: 24px;
+  height: 24px;
+  min-height: 24px;
   padding: 0;
   border-radius: 50%;
   background: transparent;
   color: var(--ak-chrome-fg);
   transition: background var(--ak-dur-fast) var(--ak-ease-fluid);
 }
-.toolbar button.btn.icon + :is(button, .collapse, .bp) { margin-left: 2px; }
+.toolbar button.btn.icon + :is(button, .collapse, .bp) { margin-left: 1px; }
 .toolbar svg {
-  width: 16px;
-  height: 16px;
+  width: 14px;
+  height: 14px;
   transition: transform var(--ak-dur-fast) var(--ak-ease-spring);
 }
 .toolbar button.btn:hover { background: var(--ak-chrome-fill); }
@@ -325,30 +325,30 @@ button.btn.icon svg { width: 16px; height: 16px; }
   grid-template-columns: 1fr;
   opacity: 1;
   filter: none;
-  margin: 0 3px;
+  margin: 0 2px;
 }
 .toolbar .modes {
   position: relative;
   display: flex;
-  gap: 2px;
-  padding: 2px;
+  gap: 1px;
+  padding: 1px;
   border-radius: var(--ak-radius-pill);
   background: var(--ak-chrome-fill);
 }
-.toolbar .modes button.btn.icon { width: 24px; height: 24px; min-height: 24px; background: transparent; }
+.toolbar .modes button.btn.icon { width: 22px; height: 22px; min-height: 22px; background: transparent; }
 .toolbar .modes button.btn.icon:hover { background: transparent; opacity: 1; }
 .toolbar .modes button.btn.icon:not([aria-pressed="true"]) { opacity: 0.6; }
-.toolbar .modes button.btn.icon svg { width: 15px; height: 15px; }
+.toolbar .modes button.btn.icon svg { width: 13px; height: 13px; }
 .toolbar .modes button:focus-visible { outline-offset: -2px; }
 .toolbar .indicator {
   position: absolute;
-  top: 2px;
-  left: 2px;
-  width: 24px;
-  height: 24px;
+  top: 1px;
+  left: 1px;
+  width: 22px;
+  height: 22px;
   border-radius: 50%;
   background: var(--ak-chrome-fill-active);
-  transform: translateX(calc(var(--i, 0) * 26px));
+  transform: translateX(calc(var(--i, 0) * 23px));
   transition: transform var(--ak-dur-morph) var(--ak-ease-spring);
 }
 
@@ -357,13 +357,13 @@ button.btn.icon svg { width: 16px; height: 16px; }
   position: absolute;
   top: -1px;
   right: -2px;
-  min-width: 14px;
-  height: 14px;
-  padding: 0 4px;
+  min-width: 12px;
+  height: 12px;
+  padding: 0 3px;
   border-radius: var(--ak-radius-pill);
   background: var(--ak-chrome-fg);
   color: var(--ak-chrome);
-  font: 600 9px/14px var(--ak-font);
+  font: 600 8px/12px var(--ak-font);
   text-align: center;
   transform: scale(0);
   opacity: 0;
@@ -377,22 +377,22 @@ button.btn.icon svg { width: 16px; height: 16px; }
 .toolbar .bp {
   display: inline-flex;
   align-items: center;
-  margin-left: 2px;
+  margin-left: 1px;
   cursor: default;
   outline: 0;
 }
 .toolbar .bp .divider {
   width: 1px;
-  height: 14px;
-  margin: 0 3px 0 1px;
+  height: 12px;
+  margin: 0 2px 0 1px;
   background: currentColor;
   opacity: 0.2;
 }
 .toolbar .bp .pill {
   display: inline-flex;
   align-items: center;
-  height: 28px;
-  padding: 0 6px;
+  height: 24px;
+  padding: 0 5px;
   border-radius: var(--ak-radius-pill);
   opacity: 0.55;
   transition:
@@ -409,8 +409,8 @@ button.btn.icon svg { width: 16px; height: 16px; }
 }
 .toolbar .bp-text {
   display: block;
-  padding-left: 6px;
-  font: 500 var(--ak-text-xs)/1 var(--ak-font);
+  padding-left: 5px;
+  font: 500 10.5px/1 var(--ak-font);
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
 }
