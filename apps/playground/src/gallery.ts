@@ -97,7 +97,7 @@ function toolbar(state: Partial<ui.ToolbarState>, keys = false) {
 section(
   "toolbar",
   "Toolbar",
-  "One pill that morphs as controls appear. Hover the device icon for the breakpoint. Icons: Phosphor.",
+  "One pill that morphs as controls appear. Hover the device icon for the breakpoint..",
   [
     specimen("Idle", "inspector off, 3 open threads", [toolbar({})], true),
     specimen("Element mode", "inspecting", [toolbar({ active: true })], true),
