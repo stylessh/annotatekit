@@ -35,6 +35,12 @@ export const THEME_TOKENS = /* css */ `
   --ak-space-4: 16px;
   --ak-panel-width: 380px;
 
+  /* Motion: springs, so size and shape changes settle instead of snapping */
+  --ak-ease-fluid: cubic-bezier(0.32, 0.72, 0, 1);
+  --ak-ease-spring: cubic-bezier(0.34, 1.4, 0.64, 1);
+  --ak-dur-morph: 520ms;
+  --ak-dur-fast: 240ms;
+
   /* Light theme: plain grayscale */
   --ak-surface: #f4f4f5;
   --ak-fg: #18181b;
@@ -47,13 +53,14 @@ export const THEME_TOKENS = /* css */ `
   --ak-chrome-fill-hover: rgba(255, 255, 255, 0.22);
   --ak-chrome-fill-active: rgba(255, 255, 255, 0.34);
 
-  /* Status colors, used at low opacity */
-  --ak-status-open: var(--ak-accent);
-  --ak-status-in-progress: #d97706;
-  --ak-status-pending-review: #9333ea;
-  --ak-status-resolved: #16a34a;
-  --ak-status-dismissed: #71717a;
-  --ak-danger: #e11d48;
+  /* Status is shown by icon shape, so these stay neutral by default. Set
+     them to colors if a host wants colored statuses. */
+  --ak-status-open: var(--ak-fg);
+  --ak-status-in-progress: var(--ak-fg);
+  --ak-status-pending-review: var(--ak-fg);
+  --ak-status-resolved: var(--ak-fg);
+  --ak-status-dismissed: var(--ak-muted);
+  --ak-danger: var(--ak-fg);
   --ak-resolved: #a1a1aa;
 
   /* Derived: every fill is the foreground at low opacity */
@@ -239,54 +246,186 @@ button.btn[aria-pressed="true"] { background: var(--ak-fill-3); }
 button.btn.icon { width: 32px; padding: 0; font-size: 18px; line-height: 1; }
 button.btn.icon svg { width: 16px; height: 16px; }
 
-/* ---- Toolbar ---------------------------------------------------------- */
+/* ---- Toolbar ----------------------------------------------------------
+ * One pill that morphs: groups expand from zero width on a spring, icons
+ * cross-fade through a blur, the mode highlight slides between buttons.
+ */
 .toolbar {
   position: fixed;
   right: 16px;
   bottom: 16px;
   pointer-events: auto;
   display: inline-flex;
-  gap: 2px;
   align-items: center;
-  padding: 4px;
+  padding: 2px;
   border-radius: var(--ak-radius-pill);
   background: var(--ak-chrome);
   color: var(--ak-chrome-fg);
+  transition: transform var(--ak-dur-fast) var(--ak-ease-fluid);
 }
+.toolbar:active:not(:has(.bp:active)) { transform: scale(0.985); }
 .toolbar button.btn.icon {
   position: relative;
-  width: 32px;
-  min-height: 32px;
-  height: 32px;
+  flex: none;
+  width: 24px;
+  height: 24px;
+  min-height: 24px;
   padding: 0;
+  border-radius: 50%;
   background: transparent;
   color: var(--ak-chrome-fg);
+  transition: background var(--ak-dur-fast) var(--ak-ease-fluid);
 }
-.toolbar button.btn.icon svg { width: 17px; height: 17px; }
+.toolbar button.btn.icon + :is(button, .collapse, .bp) { margin-left: 1px; }
+.toolbar svg {
+  width: 14px;
+  height: 14px;
+  transition: transform var(--ak-dur-fast) var(--ak-ease-spring);
+}
 .toolbar button.btn:hover { background: var(--ak-chrome-fill); }
+.toolbar button.btn:active svg { transform: scale(0.86); }
 .toolbar button.btn[aria-pressed="true"] { background: var(--ak-chrome-fill-active); }
-.toolbar .modes { display: inline-flex; gap: 2px; padding: 0 2px; margin: 0 2px; border-radius: var(--ak-radius-pill); background: var(--ak-chrome-fill); }
-.toolbar .modes[hidden] { display: none; }
-.toolbar .modes button.btn.icon { width: 30px; height: 30px; min-height: 30px; margin: 1px 0; }
-.toolbar .bp {
-  font: 500 var(--ak-text-xs)/1 var(--ak-font);
-  font-variant-numeric: tabular-nums;
-  opacity: .6;
-  padding: 0 10px 0 4px;
-  white-space: nowrap;
+
+/* Annotate ⇄ done: both icons are stacked and morph into each other. */
+.toolbar .swap { display: grid; place-items: center; }
+.toolbar .swap > svg {
+  grid-area: 1 / 1;
+  transition:
+    opacity var(--ak-dur-fast) var(--ak-ease-fluid),
+    filter var(--ak-dur-fast) var(--ak-ease-fluid),
+    transform var(--ak-dur-morph) var(--ak-ease-spring);
 }
+.toolbar [data-state="off"] .on,
+.toolbar [data-state="on"] .off {
+  opacity: 0;
+  filter: blur(3px);
+  transform: scale(0.4) rotate(-60deg);
+}
+.toolbar button.btn.icon[data-action="toggle"][aria-pressed="true"] {
+  background: var(--ak-chrome-fg);
+  color: var(--ak-chrome);
+}
+
+/* Expanding groups: a grid track animates from 0fr to 1fr, so the pill
+   follows the content's real width with no measuring. */
+.toolbar .collapse {
+  display: grid;
+  grid-template-columns: 0fr;
+  opacity: 0;
+  filter: blur(4px);
+  transition:
+    grid-template-columns var(--ak-dur-morph) var(--ak-ease-fluid),
+    opacity var(--ak-dur-fast) var(--ak-ease-fluid),
+    filter var(--ak-dur-fast) var(--ak-ease-fluid),
+    margin var(--ak-dur-morph) var(--ak-ease-fluid);
+}
+.toolbar .collapse > * { min-width: 0; overflow: hidden; }
+.toolbar .modes-wrap { margin: 0; }
+.toolbar .modes-wrap[data-open] {
+  grid-template-columns: 1fr;
+  opacity: 1;
+  filter: none;
+  margin: 0 2px;
+}
+.toolbar .modes {
+  position: relative;
+  display: flex;
+  gap: 1px;
+  padding: 1px;
+  border-radius: var(--ak-radius-pill);
+  background: var(--ak-chrome-fill);
+}
+.toolbar .modes button.btn.icon { width: 22px; height: 22px; min-height: 22px; background: transparent; }
+.toolbar .modes button.btn.icon:hover { background: transparent; opacity: 1; }
+.toolbar .modes button.btn.icon:not([aria-pressed="true"]) { opacity: 0.6; }
+.toolbar .modes button.btn.icon svg { width: 13px; height: 13px; }
+.toolbar .modes button:focus-visible { outline-offset: -2px; }
+.toolbar .indicator {
+  position: absolute;
+  top: 1px;
+  left: 1px;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: var(--ak-chrome-fill-active);
+  transform: translateX(calc(var(--i, 0) * 23px));
+  transition: transform var(--ak-dur-morph) var(--ak-ease-spring);
+}
+
+/* Threads: a count that pops in and out. */
 .toolbar .badge {
   position: absolute;
-  top: 2px;
-  right: 1px;
-  min-width: 15px;
-  height: 15px;
-  padding: 0 4px;
+  top: -1px;
+  right: -2px;
+  min-width: 12px;
+  height: 12px;
+  padding: 0 3px;
   border-radius: var(--ak-radius-pill);
   background: var(--ak-chrome-fg);
   color: var(--ak-chrome);
-  font: 600 9px/15px var(--ak-font);
+  font: 600 8px/12px var(--ak-font);
   text-align: center;
+  transform: scale(0);
+  opacity: 0;
+  transition:
+    transform var(--ak-dur-morph) var(--ak-ease-spring),
+    opacity var(--ak-dur-fast) var(--ak-ease-fluid);
+}
+.toolbar .badge[data-show] { transform: none; opacity: 1; }
+
+/* Breakpoint: a device icon; the label slides out of it on hover or focus. */
+.toolbar .bp {
+  display: inline-flex;
+  align-items: center;
+  margin-left: 1px;
+  cursor: default;
+  outline: 0;
+}
+.toolbar .bp .divider {
+  width: 1px;
+  height: 12px;
+  margin: 0 2px 0 1px;
+  background: currentColor;
+  opacity: 0.2;
+}
+.toolbar .bp .pill {
+  display: inline-flex;
+  align-items: center;
+  height: 24px;
+  padding: 0 5px;
+  border-radius: var(--ak-radius-pill);
+  opacity: 0.55;
+  transition:
+    opacity var(--ak-dur-fast) var(--ak-ease-fluid),
+    background var(--ak-dur-fast) var(--ak-ease-fluid);
+}
+.toolbar .bp .device { display: grid; place-items: center; }
+.toolbar .bp:hover .pill, .toolbar .bp:focus-visible .pill { opacity: 1; background: var(--ak-chrome-fill); }
+.toolbar .bp:focus-visible .pill { outline: 2px solid var(--ak-chrome-fg); outline-offset: -2px; }
+.toolbar .bp:hover .bp-wrap, .toolbar .bp:focus-visible .bp-wrap {
+  grid-template-columns: 1fr;
+  opacity: 1;
+  filter: none;
+}
+.toolbar .bp-text {
+  display: block;
+  padding-left: 5px;
+  font: 500 10.5px/1 var(--ak-font);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+/* Panels and composers rise out of the toolbar instead of popping in. */
+@keyframes ak-rise {
+  from { opacity: 0; transform: translateY(10px) scale(0.96); filter: blur(6px); }
+}
+.panel:not([hidden]), .composer:not([hidden]) {
+  transform-origin: 100% 100%;
+  animation: ak-rise var(--ak-dur-morph) var(--ak-ease-fluid) both;
+}
+.composer:not([hidden]) { transform-origin: 0 0; animation-duration: 380ms; }
+@media (prefers-reduced-motion: reduce) {
+  .toolbar *, .toolbar, .panel, .composer { transition-duration: 0s !important; animation: none !important; }
 }
 
 /* ---- Chips ------------------------------------------------------------ */
@@ -305,122 +444,205 @@ button.btn.icon svg { width: 16px; height: 16px; }
   text-overflow: ellipsis;
 }
 .chip.mono { font-family: var(--ak-font-mono); font-weight: 400; }
-.chip.status {
-  --c: var(--ak-status-open);
-  background: color-mix(in srgb, var(--c) var(--ak-chip-mix), var(--ak-fill-2));
-  color: color-mix(in srgb, var(--c) var(--ak-chip-text-mix), var(--ak-fg));
-}
-.chip.status::before {
-  content: ""; width: 6px; height: 6px; border-radius: 50%;
-  background: currentColor; flex: none;
-}
-.chip.status[data-status="in_progress"] { --c: var(--ak-status-in-progress); }
-.chip.status[data-status="pending_review"] { --c: var(--ak-status-pending-review); }
-.chip.status[data-status="resolved"] { --c: var(--ak-status-resolved); }
-.chip.status[data-status="dismissed"] { --c: var(--ak-status-dismissed); }
-.chip.agent { background: var(--ak-fill-1); color: var(--ak-muted); padding: 1px 8px; }
+.chip.status { padding-left: 7px; color: color-mix(in srgb, var(--ak-status-open) 100%, transparent); }
+.chip svg, .status-icon svg, .stat svg, .meta-item svg, .event-mark svg { flex: none; }
+.chip.status svg { width: 13px; height: 13px; }
+.chip.status[data-status="in_progress"] { color: var(--ak-status-in-progress); }
+.chip.status[data-status="pending_review"] { color: var(--ak-status-pending-review); }
+.chip.status[data-status="resolved"] { color: var(--ak-status-resolved); }
+.chip.status[data-status="dismissed"] { color: var(--ak-status-dismissed); }
+.status-icon { display: inline-grid; place-items: center; flex: none; color: var(--ak-status-open); }
+.status-icon svg { width: 16px; height: 16px; }
+.status-icon[data-status="in_progress"] { color: var(--ak-status-in-progress); }
+.status-icon[data-status="pending_review"] { color: var(--ak-status-pending-review); }
+.status-icon[data-status="resolved"] { color: var(--ak-status-resolved); }
+.status-icon[data-status="dismissed"] { color: var(--ak-status-dismissed); }
 
-/* ---- Panels ----------------------------------------------------------- */
+/* ---- Panels -----------------------------------------------------------
+ * Panels grow out of the toolbar. Height changes are animated by the panel
+ * script (a FLIP on height), so switching views or adding a reply morphs the
+ * panel instead of snapping it.
+ */
 .panel {
   position: fixed;
   right: 16px;
-  bottom: 64px;
+  bottom: 58px;
   width: min(var(--ak-panel-width), calc(100vw - 32px));
-  max-height: min(600px, calc(100vh - 104px));
+  max-height: min(560px, calc(100vh - 96px));
   overflow: auto;
   overscroll-behavior: contain;
   pointer-events: auto;
-  padding: var(--ak-space-3);
-  border-radius: var(--ak-radius-lg);
+  padding: 6px;
+  border-radius: 20px;
   background: var(--ak-surface);
   color: var(--ak-fg);
+  transform-origin: 100% 100%;
 }
-.panel.thread { display: flex; flex-direction: column; padding: 0; overflow: hidden; }
-.panel-head { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; min-height: 32px; }
+.panel.threads { display: flex; flex-direction: column; overflow: hidden; }
+.panel-head {
+  display: flex; align-items: center; gap: 4px;
+  min-height: 32px; padding: 0 0 0 10px;
+  flex: none;
+}
 .panel-head strong { margin-right: auto; font-weight: 600; font-size: var(--ak-text-md); }
-.panel.thread .panel-head { padding: var(--ak-space-3) var(--ak-space-3) 0 var(--ak-space-4); margin: 0; }
 .panel-head .title {
   flex: 1; min-width: 0;
-  font-weight: 600; font-size: var(--ak-text-md);
+  display: flex; align-items: center; gap: 6px;
+  font-weight: 600; font-size: var(--ak-text-sm);
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
+.panel-head span.title { display: block; }
+.panel-head .count {
+  min-width: 18px; height: 18px; padding: 0 5px;
+  border-radius: var(--ak-radius-pill);
+  background: var(--ak-fill-2); color: var(--ak-muted);
+  font: 600 10px/18px var(--ak-font); text-align: center;
+}
+.panel-head button.btn.icon, .head-actions button.btn.icon { width: 28px; min-height: 28px; height: 28px; }
+.panel-head button.btn.icon svg { width: 15px; height: 15px; }
+.panel-head [data-action="back"] { margin-left: -8px; }
+.panel.thread .panel-head { padding-left: 2px; }
+.panel.thread .panel-head .status-icon { margin: 0 2px 0 -2px; }
+.head-actions { display: flex; gap: 2px; flex: none; }
+.head-actions button.btn.primary { background: var(--ak-accent); color: var(--ak-on-accent); }
 .panel-head .all { color: var(--ak-muted); font-size: var(--ak-text-sm); }
 .panel .dim { color: var(--ak-muted); font-size: var(--ak-text-sm); }
 .panel code { font: var(--ak-text-sm)/1.4 var(--ak-font-mono); }
 .panel .empty, .state { color: var(--ak-muted); margin: 4px 0 8px; }
 .panel .error { color: var(--ak-danger); margin: 0 0 8px; }
-.thread-meta { display: flex; flex-wrap: wrap; gap: 6px; padding: var(--ak-space-2) var(--ak-space-4) 0; }
-.thread-body { flex: 1; min-height: 0; overflow: auto; overscroll-behavior: contain; padding: var(--ak-space-3) var(--ak-space-3) var(--ak-space-2); }
-.thread-foot { padding: var(--ak-space-2) var(--ak-space-3) var(--ak-space-3); display: grid; gap: var(--ak-space-2); }
-.thread-actions { display: flex; gap: 6px; justify-content: flex-end; }
+.panel:not(.threads) .panel-head { margin-bottom: 6px; }
+
+/* Where the note was left: quiet, one line, icons instead of labels. */
+.thread-meta {
+  display: flex; gap: 10px; align-items: center;
+  min-width: 0; flex: none;
+  padding: 0 10px 6px 12px;
+  color: var(--ak-muted); font-size: var(--ak-text-xs);
+}
+.meta-item { display: inline-flex; align-items: center; gap: 4px; min-width: 0; white-space: nowrap; }
+.meta-item svg { width: 12px; height: 12px; opacity: .8; }
+.meta-item.mono { flex: 0 1 auto; font-family: var(--ak-font-mono); }
+.meta-item.mono span { overflow: hidden; text-overflow: ellipsis; }
+.meta-item:not(.mono) { flex: none; font-variant-numeric: tabular-nums; }
+.thread-body {
+  flex: 1 1 auto; min-height: 0;
+  overflow: auto; overscroll-behavior: contain;
+  padding: 4px 6px 4px;
+  border-radius: 14px;
+}
+/* Scrolled content fades out at the edges instead of being cut. */
+.thread-body[data-more-above] { -webkit-mask-image: linear-gradient(transparent, #000 20px); mask-image: linear-gradient(transparent, #000 20px); }
+.thread-body[data-more-below] { -webkit-mask-image: linear-gradient(#000 calc(100% - 28px), transparent); mask-image: linear-gradient(#000 calc(100% - 28px), transparent); }
+.thread-body[data-more-above][data-more-below] {
+  -webkit-mask-image: linear-gradient(transparent, #000 20px, #000 calc(100% - 28px), transparent);
+  mask-image: linear-gradient(transparent, #000 20px, #000 calc(100% - 28px), transparent);
+}
+.thread-foot { flex: none; padding: 4px 0 0; }
 
 /* ---- Thread list ------------------------------------------------------ */
-.thread-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; }
+.thread-list {
+  list-style: none; margin: 0; padding: 0;
+  display: grid; gap: 1px;
+  overflow: auto; overscroll-behavior: contain; min-height: 0;
+}
 .thread-list button.item {
   all: unset;
   box-sizing: border-box;
   display: grid;
-  grid-template-columns: 26px 1fr auto;
-  gap: 2px 10px;
+  grid-template-columns: 20px minmax(0, 1fr) auto;
+  gap: 0 10px;
   align-items: center;
   width: 100%;
-  padding: 10px 12px;
-  border-radius: var(--ak-radius-md);
-  background: var(--ak-fill-1);
+  padding: 7px 10px;
+  border-radius: 12px;
   cursor: pointer;
+  transition: background var(--ak-dur-fast) var(--ak-ease-fluid);
 }
-.thread-list button.item:hover { background: var(--ak-fill-2); }
-.thread-list button.item:focus-visible { outline: 2px solid var(--ak-accent); outline-offset: 2px; }
+.thread-list button.item:hover { background: var(--ak-fill-1); }
+.thread-list button.item:active { background: var(--ak-fill-2); }
+.thread-list button.item:focus-visible { outline: 2px solid var(--ak-accent); outline-offset: -2px; }
 .thread-list .num {
-  grid-row: span 2;
-  width: 26px; height: 26px;
-  border-radius: 13px 13px 13px 3px;
+  grid-row: span 2; align-self: start; margin-top: 1px;
+  width: 20px; height: 20px;
+  border-radius: 10px 10px 10px 3px;
   background: var(--ak-accent); color: var(--ak-on-accent);
-  font-size: var(--ak-text-xs); font-weight: 600; line-height: 26px; text-align: center;
+  font-size: 10px; font-weight: 600; line-height: 20px; text-align: center;
 }
 :host([data-theme="vivid"]) .thread-list .num { background: var(--ak-fill-3); }
-.thread-list [data-closed] .num { background: var(--ak-resolved); }
-.thread-list .item-title { font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.thread-list .item-sub { grid-column: 2 / 4; color: var(--ak-muted); font-size: var(--ak-text-xs); }
+.thread-list [data-closed] .num { background: var(--ak-fill-3); color: var(--ak-muted); }
+.thread-list [data-closed] .item-title { color: var(--ak-muted); }
+.thread-list .item-title { font-size: var(--ak-text-sm); font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.thread-list .item-side { display: inline-flex; align-items: center; gap: 8px; color: var(--ak-muted); }
+.thread-list .item-side .status-icon svg { width: 15px; height: 15px; }
+.stat { display: inline-flex; align-items: center; gap: 3px; font-size: var(--ak-text-xs); font-variant-numeric: tabular-nums; }
+.stat svg { width: 13px; height: 13px; }
+.thread-list .item-sub {
+  grid-column: 2 / 4;
+  display: flex; gap: 6px; min-width: 0;
+  color: var(--ak-faint); font-size: var(--ak-text-xs);
+}
+.thread-list .item-sub .who { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.thread-list .item-sub .who::after { content: "·"; margin-left: 6px; }
 
-/* ---- Messages --------------------------------------------------------- */
-.messages { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--ak-space-2); }
-.msg {
-  display: grid;
-  grid-template-columns: 28px 1fr;
-  gap: 6px 10px;
-  padding: 10px 12px 12px;
-  border-radius: var(--ak-radius-md);
-  background: var(--ak-fill-1);
-}
-.msg.reply { margin-left: 22px; background: transparent; padding: 6px 12px 6px 8px; }
-.msg .avatar { grid-row: span 2; }
-.msg-head { display: flex; align-items: baseline; gap: 6px; min-width: 0; }
+/* ---- Messages ---------------------------------------------------------
+ * A feedback thread, not a chat: the note first, then replies and status
+ * changes hang off one vertical line. No bubbles, small avatars.
+ */
+.messages { list-style: none; margin: 0; padding: 0; display: grid; }
+.msg, .event { position: relative; display: grid; grid-template-columns: 20px minmax(0, 1fr); column-gap: 8px; }
+.msg { row-gap: 2px; padding: 6px 4px 8px; }
+.msg .avatar { grid-row: 1; align-self: center; }
+.msg-head { grid-column: 2; display: flex; align-items: baseline; gap: 6px; min-width: 0; line-height: 20px; }
 .msg-head .name { font-weight: 600; font-size: var(--ak-text-sm); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.msg-head time { color: var(--ak-faint); font-size: var(--ak-text-xs); white-space: nowrap; margin-left: auto; }
-.msg-body { grid-column: 2; white-space: pre-wrap; overflow-wrap: anywhere; font-size: var(--ak-text-md); }
+.msg-head time { color: var(--ak-faint); font-size: var(--ak-text-xs); white-space: nowrap; font-variant-numeric: tabular-nums; }
+.agent-tag { display: inline-grid; place-items: center; align-self: center; color: var(--ak-muted); }
+.agent-tag svg { width: 12px; height: 12px; }
+.msg-body { grid-column: 2; white-space: pre-wrap; overflow-wrap: anywhere; font-size: var(--ak-text-sm); line-height: 1.5; }
+.msg.note .msg-body { font-size: var(--ak-text-md); line-height: 1.45; }
 .msg-body:empty { display: none; }
-.msg .attachments { grid-column: 2; }
-.replies-label { color: var(--ak-muted); font-size: var(--ak-text-xs); font-weight: 500; padding: 2px 12px 0 34px; }
-.event {
-  display: flex; align-items: center; gap: 8px;
-  padding: 2px 12px 2px 34px;
-  color: var(--ak-muted); font-size: var(--ak-text-xs);
+.msg .attachments { grid-column: 2; margin-top: 4px; }
+/* The note is set apart from the replies by a hairline. */
+.msg.note { padding-bottom: 12px; margin-bottom: 4px; }
+.msg.note:not(:last-child)::after {
+  content: ""; position: absolute; left: 4px; right: 4px; bottom: 0;
+  height: 1px; background: var(--ak-fill-2);
 }
-.event::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: var(--ak-fill-3); flex: none; margin-left: -18px; }
-.event time { color: var(--ak-faint); margin-left: auto; }
+/* The timeline: one rail runs through the replies' avatars and event marks. */
+.messages > :is(.reply, .event)::before {
+  content: ""; position: absolute; left: 13.5px; top: 0; bottom: 0;
+  width: 1px; background: var(--ak-fill-2);
+}
+.messages > .note + :is(.reply, .event)::before { top: 14px; }
+.messages > :is(.reply, .event):last-child::before { bottom: calc(100% - 14px); }
+.messages > .note + :is(.reply, .event):last-child::before { display: none; }
+.msg .avatar, .event-mark { position: relative; z-index: 1; }
+.event { align-items: center; padding: 4px 4px; color: var(--ak-muted); font-size: var(--ak-text-xs); }
+.event-mark { display: grid; place-items: center; width: 20px; height: 20px; border-radius: 50%; background: var(--ak-surface); }
+.event-mark svg { width: 13px; height: 13px; }
+.event-text { display: flex; gap: 6px; min-width: 0; }
+.event { grid-template-columns: 20px minmax(0, 1fr) auto; }
+.event time { color: var(--ak-faint); white-space: nowrap; padding-left: 8px; }
+.msg-head time::before { content: "·"; margin-right: 6px; }
 
 .avatar {
-  width: 28px; height: 28px;
+  position: relative;
+  width: 20px; height: 20px;
   border-radius: 50%;
   background: var(--ak-fill-2);
   color: var(--ak-fg);
-  font-size: var(--ak-text-xs); font-weight: 600; line-height: 28px; text-align: center;
-  overflow: hidden; flex: none;
+  font-size: 8.5px; font-weight: 600; line-height: 20px; text-align: center; letter-spacing: .02em;
+  flex: none;
 }
-.avatar[data-kind="agent"] { border-radius: 9px; background: color-mix(in srgb, var(--ak-accent) 22%, transparent); }
-:host([data-theme="vivid"]) .avatar[data-kind="agent"] { background: var(--ak-fill-3); }
-.avatar img { width: 100%; height: 100%; object-fit: cover; display: block; }
+/* Solid, so the timeline rail passes behind it. */
+.avatar { background: color-mix(in srgb, var(--ak-fg) 10%, var(--ak-surface)); }
+.avatar[data-kind="agent"] { border-radius: 6px; background: color-mix(in srgb, var(--ak-fg) 18%, var(--ak-surface)); }
+.avatar img { width: 100%; height: 100%; object-fit: cover; display: block; border-radius: inherit; }
+
+/* New entries settle in instead of appearing. */
+@keyframes ak-enter {
+  from { opacity: 0; transform: translateY(6px); filter: blur(4px); }
+}
+.messages > [data-new] { animation: ak-enter var(--ak-dur-morph) var(--ak-ease-fluid) both; }
 
 /* ---- Attachments ------------------------------------------------------ */
 .attachments { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 2px; }
@@ -437,8 +659,8 @@ button.btn.icon svg { width: 16px; height: 16px; }
 a.attachment:hover { background: var(--ak-fill-3); }
 .attachment.image { width: 104px; height: 78px; padding: 0; }
 .attachment.image img { width: 100%; height: 100%; object-fit: cover; display: block; }
-.attachments.single .attachment.image { width: auto; max-width: 100%; height: auto; max-height: 200px; }
-.attachments.single .attachment.image img { width: auto; max-width: 100%; height: auto; max-height: 200px; }
+.attachments.single .attachment.image { width: auto; max-width: 100%; height: auto; max-height: 168px; }
+.attachments.single .attachment.image img { width: auto; max-width: 100%; height: auto; max-height: 168px; }
 .attachment.file { padding: 6px 10px 6px 6px; min-height: 40px; }
 .attachment .file-icon {
   width: 28px; height: 28px; border-radius: 8px; flex: none;
@@ -491,7 +713,24 @@ a.attachment:hover { background: var(--ak-fill-3); }
 }
 .field textarea::placeholder { color: var(--ak-faint); }
 .field textarea:focus-visible { outline: 0; }
-.reply .field textarea { min-height: 22px; }
+/* Reply: one pill; the text grows it, icon buttons sit inside on the right. */
+form.reply .field {
+  gap: 6px;
+  padding: 4px 4px 4px 14px;
+  border-radius: 18px;
+}
+form.reply .line { display: flex; align-items: flex-end; gap: 2px; }
+form.reply .field textarea {
+  flex: 1; min-height: 28px; max-height: 160px;
+  padding: 4px 0; font-size: var(--ak-text-sm); line-height: 20px;
+  transition: height var(--ak-dur-fast) var(--ak-ease-fluid);
+}
+form.reply button.btn.icon { width: 28px; height: 28px; min-height: 28px; flex: none; }
+form.reply button.btn.icon svg { width: 15px; height: 15px; }
+form.reply .send { transition: opacity var(--ak-dur-fast) var(--ak-ease-fluid), transform var(--ak-dur-fast) var(--ak-ease-spring); }
+form.reply .send:disabled { opacity: .35; }
+form.reply .tray { padding-top: 6px; }
+form.reply .form-error { padding: 4px 14px 0; }
 .row { display: flex; gap: 6px; align-items: center; }
 .row .hint { margin-right: auto; color: var(--ak-faint); font-size: var(--ak-text-xs); }
 .row .spacer { margin-right: auto; }
@@ -517,12 +756,13 @@ a.attachment:hover { background: var(--ak-fill-3); }
 .state strong { color: var(--ak-fg); font-weight: 600; }
 .state p { margin: 0; max-width: 260px; font-size: var(--ak-text-sm); }
 .skeleton { display: grid; gap: var(--ak-space-2); }
+.skeleton { padding: 4px 6px; }
 .skeleton .bone {
-  height: 64px; border-radius: var(--ak-radius-md);
+  height: 44px; border-radius: 12px;
   background: var(--ak-fill-1);
   animation: ak-pulse 1.4s ease-in-out infinite;
 }
-.skeleton .bone.short { height: 40px; width: 70%; margin-left: 22px; }
+.skeleton .bone.short { height: 28px; width: 72%; margin-left: 28px; }
 .skeleton .bone.line { height: 14px; width: 45%; border-radius: var(--ak-radius-pill); }
 @keyframes ak-pulse { 50% { opacity: .45; } }
 @media (prefers-reduced-motion: reduce) {

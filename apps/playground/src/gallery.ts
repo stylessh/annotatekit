@@ -97,7 +97,7 @@ function toolbar(state: Partial<ui.ToolbarState>, keys = false) {
 section(
   "toolbar",
   "Toolbar",
-  "Compact and icon-only. Floats bottom-right; labels are tooltips. Grayscale by default.",
+  "One pill that morphs as controls appear. Hover the device icon for the breakpoint.",
   [
     specimen("Idle", "inspector off, 3 open threads", [toolbar({})], true),
     specimen("Element mode", "inspecting", [toolbar({ active: true })], true),
@@ -277,7 +277,7 @@ function messages(list: ReturnType<typeof comment>[]) {
 section(
   "messages",
   "Messages",
-  "The first message, replies under it, and status changes as events.",
+  "A feedback thread, not a chat: the note first, then replies and status changes on a rail.",
   [
     specimen("Text only", "", [
       messages([comment(people.maya, "The pricing cards don't line up at lg.", 12)]),
@@ -299,9 +299,9 @@ section(
     specimen("Agent reply and events", "your own messages read “You”", [
       messages([
         comment(people.alan, "Can you fix the link color?", 200),
-        event(people.claude, "Claude started working on this", 90, "status"),
+        event(people.claude, "Claude started working on this", 90, "status", "in_progress"),
         comment(people.claude, "Switched links to `--brand-600`. Ready for review.", 80),
-        event(people.claude, "Claude proposed a fix for review", 79, "status"),
+        event(people.claude, "Claude proposed a fix for review", 79, "status", "pending_review"),
         comment(people.maya, "Looks right to me.", 2, {
           editedAt: new Date(NOW - 60_000).toISOString(),
         }),
@@ -334,7 +334,7 @@ const single = (status: ThreadStatus, body: string) => ({
 section(
   "thread",
   "Thread panel",
-  "Opens when a pin is clicked: context, conversation, reply composer and status actions.",
+  "Opens when a pin is clicked: the note, where it was left, replies and status changes on one timeline. Status actions are icons in the header.",
   [
     specimen("Needs review", "an agent proposed a fix", [threadPanel(ready(conversation()))]),
     specimen("Open", "just one message", [

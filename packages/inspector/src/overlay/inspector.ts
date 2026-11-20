@@ -488,6 +488,7 @@ export function createInspector(options: InspectorOptions = {}): Inspector {
       active,
       mode,
       breakpoint: `${breakpoint.name} · ${viewport.width}px`,
+      width: viewport.width,
       threads: !!threadSource,
       threadsOpen: threadsPanel.open && !threadsPanel.threadId,
       unresolved: annotations.filter((a) => a.status !== "resolved" && a.status !== "dismissed")

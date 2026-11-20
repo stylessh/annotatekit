@@ -50,7 +50,7 @@ describe("thread panel", () => {
     expect($(".panel-head .title").textContent).toBe("Bigger button");
     const names = [...root.querySelectorAll(".msg .name")].map((n) => n.textContent);
     expect(names).toEqual(["You", "Claude"]);
-    expect($(".msg.reply .chip.agent").textContent).toBe("Agent");
+    expect($(".msg.reply .agent-tag").getAttribute("aria-label")).toBe("Agent");
 
     $<HTMLTextAreaElement>(".reply textarea").value = "Thanks!";
     const input = $<HTMLInputElement>(".reply input[type=file]");
@@ -77,7 +77,7 @@ describe("thread panel", () => {
     $<HTMLButtonElement>('[data-action="resolve"]').click();
     await flush(8);
     expect((await service.getThread(alan, thread.id)).thread.status).toBe("resolved");
-    expect($(".panel-head .chip.status").getAttribute("data-status")).toBe("resolved");
+    expect($(".panel-head .status-icon").getAttribute("data-status")).toBe("resolved");
 
     $<HTMLButtonElement>('.toolbar [data-action="threads"]').click();
     await flush();
